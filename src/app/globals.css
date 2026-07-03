@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Editable field affordance */
+.editable {
+  @apply w-full resize-y rounded-md border border-slate-200 bg-white px-2 py-1 text-sm leading-snug
+         focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand;
+}
+
+.label {
+  @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500;
+}
