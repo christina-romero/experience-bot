@@ -18,60 +18,107 @@ function phaseColor(phaseRaw: string, kind: string): string {
   return "1F4E79";
 }
 
+const FONT = "Radio Canada";
+const INK = "0F172A";
+const SUBINK = "475569";
+const PAPER = "F5F5F0";
+const BRAND = "1F4E79";
+const W = 13.333;
+
+// Teacher guidance + possible responses -> speaker notes.
+function speakerNotes(slide: PptxGenJS.Slide, s: SlideDeck["slides"][number]) {
+  const notes: string[] = [];
+  if (s.teacherGuidance) notes.push(`TEACHER GUIDANCE:\n${s.teacherGuidance}`);
+  if (s.possibleResponses && s.possibleResponses.length) {
+    notes.push(`POSSIBLE STUDENT RESPONSES:\n` + s.possibleResponses.map((r) => `- ${r}`).join("\n"));
+  }
+  if (notes.length) slide.addNotes(notes.join("\n\n"));
+}
+
+function footer(pptx: PptxGenJS, slide: PptxGenJS.Slide, deck: SlideDeck, s: SlideDeck["slides"][number], color: string) {
+  slide.addShape(pptx.ShapeType.rect, { x: 0, y: 7.05, w: W, h: 0.45, fill: { color } });
+  slide.addText(`${s.phase || deck.lessonType}   |   ${deck.day}   |   Slide ${s.n}`, {
+    x: 0.3, y: 7.05, w: W - 0.6, h: 0.45, fontSize: 11, color: "FFFFFF", valign: "middle", fontFace: FONT,
+  });
+}
+
 function buildDeck(deck: SlideDeck): PptxGenJS {
   const pptx = new PptxGenJS();
-  pptx.defineLayout({ name: "F2", width: 13.333, height: 7.5 });
+  pptx.defineLayout({ name: "F2", width: W, height: 7.5 });
   pptx.layout = "F2";
-  pptx.theme = { headFontFace: "Radio Canada", bodyFontFace: "Radio Canada" };
+  pptx.theme = { headFontFace: FONT, bodyFontFace: FONT };
 
   for (const s of deck.slides) {
     const slide = pptx.addSlide();
     const color = phaseColor(s.phase, s.kind);
 
-    if (s.kind === "title" || s.kind === "divider" || s.kind === "attribution") {
-      slide.background = { color: "F5F5F0" };
+    // ---- Title slide: full brand background, big type ----
+    if (s.kind === "title") {
+      slide.background = { color: BRAND };
+      slide.addText((deck.lessonType || "").toUpperCase(), {
+        x: 0.8, y: 1.3, w: 11.7, h: 0.6, fontSize: 16, bold: true, color: "BFD3E6", charSpacing: 2, fontFace: FONT,
+      });
+      slide.addText(s.heading || deck.lessonTitle, {
+        x: 0.8, y: 2.0, w: 11.7, h: 1.9, fontSize: 40, bold: true, color: "FFFFFF", valign: "top", fontFace: FONT,
+      });
+      if (s.onSlide) {
+        slide.addText(s.onSlide, {
+          x: 0.8, y: 4.1, w: 11.7, h: 2.6, fontSize: 18, color: "E2E8F0", valign: "top", fontFace: FONT,
+        });
+      }
+      speakerNotes(slide, s);
+      continue;
     }
+
+    // ---- Divider slide: centered section marker ----
+    if (s.kind === "divider") {
+      slide.background = { color: PAPER };
+      slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.3, fill: { color } });
+      slide.addText((s.phase || "").toUpperCase(), {
+        x: 1, y: 2.5, w: W - 2, h: 0.6, fontSize: 18, bold: true, color, align: "center", charSpacing: 2, fontFace: FONT,
+      });
+      slide.addText(s.heading || "", {
+        x: 1, y: 3.1, w: W - 2, h: 1.1, fontSize: 34, bold: true, color: INK, align: "center", fontFace: FONT,
+      });
+      if (s.onSlide) {
+        slide.addText(s.onSlide, {
+          x: 1, y: 4.3, w: W - 2, h: 0.8, fontSize: 18, color: SUBINK, align: "center", fontFace: FONT,
+        });
+      }
+      speakerNotes(slide, s);
+      continue;
+    }
+
+    // ---- Content / materials / reflection / closure / attribution ----
+    slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.28, fill: { color } });
 
     slide.addText(s.heading || deck.lessonTitle, {
-      x: 0.5, y: 0.35, w: 12.3, h: 0.9,
-      fontSize: s.kind === "title" ? 30 : 24, bold: true, color: "0F172A", fontFace: "Radio Canada",
+      x: 0.6, y: 0.55, w: 10, h: 0.9, fontSize: 26, bold: true, color: INK, valign: "top", fontFace: FONT,
     });
-
     if (s.time) {
-      slide.addText(`Time: ${s.time}`, {
-        x: 10.6, y: 0.4, w: 2.2, h: 0.4, fontSize: 12, align: "right", color: "475569",
+      slide.addText(s.time, {
+        x: 10.7, y: 0.6, w: 2.0, h: 0.4, fontSize: 13, align: "right", color: SUBINK, fontFace: FONT,
       });
     }
 
+    const hasStems = !!(s.sentenceStems && s.sentenceStems.length);
     if (s.onSlide) {
       slide.addText(s.onSlide, {
-        x: 0.6, y: 1.5, w: 12.1, h: 3.4, fontSize: 18, color: "1E293B", valign: "top", fontFace: "Radio Canada",
+        x: 0.6, y: 1.7, w: 12.1, h: hasStems ? 3.0 : 4.8, fontSize: 20, color: "1E293B", valign: "top", fontFace: FONT,
       });
     }
-
-    if (s.sentenceStems && s.sentenceStems.length) {
+    if (hasStems) {
       slide.addText(
         [
-          { text: "Sentence stems:\n", options: { bold: true, fontSize: 14 } },
-          ...s.sentenceStems.map((st) => ({ text: `• ${st}\n`, options: { fontSize: 14 } })),
+          { text: "Sentence stems\n", options: { bold: true, fontSize: 15, color: color } },
+          ...s.sentenceStems.map((st) => ({ text: `•  ${st}\n`, options: { fontSize: 15 } })),
         ],
-        { x: 0.6, y: 5.0, w: 12.1, h: 1.4, color: "334155", valign: "top", fontFace: "Radio Canada" }
+        { x: 0.6, y: 4.9, w: 12.1, h: 1.8, color: "334155", valign: "top", fontFace: FONT }
       );
     }
 
-    // Color-coded footer band by phase.
-    slide.addShape(pptx.ShapeType.rect, { x: 0, y: 7.05, w: 13.333, h: 0.45, fill: { color } });
-    slide.addText(`${s.phase || deck.lessonType}   |   ${deck.day}   |   Slide ${s.n}`, {
-      x: 0.3, y: 7.05, w: 12.7, h: 0.45, fontSize: 11, color: "FFFFFF", valign: "middle", fontFace: "Radio Canada",
-    });
-
-    // Teacher guidance + possible responses -> speaker notes.
-    const notes: string[] = [];
-    if (s.teacherGuidance) notes.push(`TEACHER GUIDANCE:\n${s.teacherGuidance}`);
-    if (s.possibleResponses && s.possibleResponses.length) {
-      notes.push(`POSSIBLE STUDENT RESPONSES:\n` + s.possibleResponses.map((r) => `- ${r}`).join("\n"));
-    }
-    if (notes.length) slide.addNotes(notes.join("\n\n"));
+    footer(pptx, slide, deck, s, color);
+    speakerNotes(slide, s);
   }
 
   return pptx;
