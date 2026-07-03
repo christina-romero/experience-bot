@@ -532,22 +532,13 @@ function DocInput({
           </button>
         </div>
       ) : (
-        <>
-          <input
-            type="url"
-            className="editable mb-2"
-            placeholder="Or paste a Google Drive link (a Doc, Slides, or file in your Drive)"
-            value={value.driveUrl ?? ""}
-            onChange={(e) => onChange({ ...value, driveUrl: e.target.value })}
-          />
-          <textarea
-            className="editable"
-            rows={3}
-            placeholder={hint}
-            value={value.text}
-            onChange={(e) => onChange({ ...value, text: e.target.value })}
-          />
-        </>
+        <textarea
+          className="editable"
+          rows={3}
+          placeholder={hint}
+          value={value.text}
+          onChange={(e) => onChange({ ...value, text: e.target.value })}
+        />
       )}
     </div>
   );
