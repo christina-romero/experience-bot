@@ -10,7 +10,6 @@ import {
   TableRow,
   TableCell,
   WidthType,
-  AlignmentType,
   BorderStyle,
 } from "docx";
 import type { ScopeSequence, LessonWeek } from "./schemas";
@@ -52,7 +51,7 @@ const tableBorders = {
   insideHorizontal: thinBorder, insideVertical: thinBorder,
 };
 
-export async function exportScopeSequenceDocx(scope: ScopeSequence) {
+function buildScopeSequenceDoc(scope: ScopeSequence): Document {
   const children: (Paragraph | Table)[] = [];
 
   children.push(new Paragraph({
@@ -96,12 +95,23 @@ export async function exportScopeSequenceDocx(scope: ScopeSequence) {
     }));
   }
 
-  const doc = new Document({ sections: [{ children }] });
-  const blob = await Packer.toBlob(doc);
-  download(blob, `F2_ScopeSequence_${scope.competency.replace(/[^a-z0-9]+/gi, "_")}_${scope.gradeBand.replace("/", "-")}.docx`);
+  return new Document({ sections: [{ children }] });
 }
 
-export async function exportLessonWeekDocx(scope: ScopeSequence, wk: LessonWeek) {
+export function scopeSequenceFileName(scope: ScopeSequence) {
+  return `F2_ScopeSequence_${scope.competency.replace(/[^a-z0-9]+/gi, "_")}_${scope.gradeBand.replace("/", "-")}`;
+}
+
+export async function exportScopeSequenceDocx(scope: ScopeSequence) {
+  const blob = await Packer.toBlob(buildScopeSequenceDoc(scope));
+  download(blob, `${scopeSequenceFileName(scope)}.docx`);
+}
+
+export async function scopeSequenceDocxBase64(scope: ScopeSequence): Promise<string> {
+  return Packer.toBase64String(buildScopeSequenceDoc(scope));
+}
+
+function buildLessonWeekDoc(scope: ScopeSequence, wk: LessonWeek): Document {
   const children: (Paragraph | Table)[] = [];
   children.push(new Paragraph({
     text: `Lesson Plans — Week ${wk.week} — ${scope.competency} (${scope.gradeBand})`,
@@ -157,7 +167,18 @@ export async function exportLessonWeekDocx(scope: ScopeSequence, wk: LessonWeek)
     children.push(new Paragraph({ text: "", spacing: { after: 200 } }));
   }
 
-  const doc = new Document({ sections: [{ children }] });
-  const blob = await Packer.toBlob(doc);
-  download(blob, `F2_LessonPlans_Week${wk.week}_${scope.competency.replace(/[^a-z0-9]+/gi, "_")}_${scope.gradeBand.replace("/", "-")}.docx`);
+  return new Document({ sections: [{ children }] });
+}
+
+export function lessonWeekFileName(scope: ScopeSequence, wk: LessonWeek) {
+  return `F2_LessonPlans_Week${wk.week}_${scope.competency.replace(/[^a-z0-9]+/gi, "_")}_${scope.gradeBand.replace("/", "-")}`;
+}
+
+export async function exportLessonWeekDocx(scope: ScopeSequence, wk: LessonWeek) {
+  const blob = await Packer.toBlob(buildLessonWeekDoc(scope, wk));
+  download(blob, `${lessonWeekFileName(scope, wk)}.docx`);
+}
+
+export async function lessonWeekDocxBase64(scope: ScopeSequence, wk: LessonWeek): Promise<string> {
+  return Packer.toBase64String(buildLessonWeekDoc(scope, wk));
 }

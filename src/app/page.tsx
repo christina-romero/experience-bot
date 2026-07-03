@@ -1,13 +1,20 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button, Banner, Card, Spinner } from "@/components/ui";
 import { ScopeSequenceEditor } from "@/components/ScopeSequenceEditor";
 import { LessonWeekEditor } from "@/components/LessonWeekEditor";
 import { SlideDeckEditor } from "@/components/SlideDeckEditor";
 import type { ScopeSequence, LessonWeek, SlideDeck, LessonPlan } from "@/lib/schemas";
-import { exportScopeSequenceDocx, exportLessonWeekDocx } from "@/lib/export-docx";
-import { exportSlideDeckPptx } from "@/lib/export-pptx";
+import {
+  exportScopeSequenceDocx,
+  exportLessonWeekDocx,
+  scopeSequenceDocxBase64,
+  scopeSequenceFileName,
+  lessonWeekDocxBase64,
+  lessonWeekFileName,
+} from "@/lib/export-docx";
+import { exportSlideDeckPptx, slideDeckPptxBase64, slideDeckFileName } from "@/lib/export-pptx";
 
 const COMPETENCIES = [
   "Collaboration & Teamwork",
@@ -53,6 +60,16 @@ export default function Page() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [driveEnabled, setDriveEnabled] = useState(false);
+  const [links, setLinks] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/api/publish")
+      .then((r) => r.json())
+      .then((d) => setDriveEnabled(!!d.enabled))
+      .catch(() => setDriveEnabled(false));
+  }, []);
+
   function guard(fn: () => Promise<void>, token: string) {
     return async () => {
       setError(null);
@@ -65,6 +82,15 @@ export default function Page() {
         setBusy(null);
       }
     };
+  }
+
+  function publish(token: string, kind: "doc" | "slides", name: string, makeBase64: () => Promise<string>) {
+    return guard(async () => {
+      const base64 = await makeBase64();
+      const res = await post<{ webViewLink: string }>("/api/publish", { name, kind, base64 });
+      setLinks((l) => ({ ...l, [token]: res.webViewLink }));
+      window.open(res.webViewLink, "_blank");
+    }, token);
   }
 
   const gen1 = guard(async () => {
@@ -197,6 +223,10 @@ export default function Page() {
             regenBusy={busy === "scope"}
             onExport={() => exportScopeSequenceDocx(scope)}
             exportLabel="Download .docx"
+            driveEnabled={driveEnabled}
+            onPublish={publish("publish-scope", "doc", scopeSequenceFileName(scope), () => scopeSequenceDocxBase64(scope))}
+            publishBusy={busy === "publish-scope"}
+            publishLink={links["publish-scope"]}
             nextLabel="Go to Lesson Plans"
             onNext={scopeApproved ? () => setStage("plans") : undefined}
           />
@@ -234,6 +264,22 @@ export default function Page() {
                         <Button variant="secondary" onClick={() => exportLessonWeekDocx(scope, generated)}>
                           Download .docx
                         </Button>
+                        {driveEnabled && (
+                          <Button
+                            variant="secondary"
+                            disabled={busy !== null}
+                            onClick={publish(`publish-week-${wk.week}`, "doc", lessonWeekFileName(scope, generated), () =>
+                              lessonWeekDocxBase64(scope, generated)
+                            )}
+                          >
+                            {busy === `publish-week-${wk.week}` ? "Publishing…" : "Publish to Drive"}
+                          </Button>
+                        )}
+                        {links[`publish-week-${wk.week}`] && (
+                          <a href={links[`publish-week-${wk.week}`]} target="_blank" rel="noreferrer" className="text-sm text-brand-light underline">
+                            View in Drive ↗
+                          </a>
+                        )}
                         <Button
                           variant={weekApproved[wk.week] ? "success" : "primary"}
                           onClick={() => setWeekApproved((a) => ({ ...a, [wk.week]: !a[wk.week] }))}
@@ -283,6 +329,22 @@ export default function Page() {
                         <Button variant="secondary" onClick={() => exportSlideDeckPptx(deck)}>
                           Download .pptx
                         </Button>
+                        {driveEnabled && (
+                          <Button
+                            variant="secondary"
+                            disabled={busy !== null}
+                            onClick={publish(`publish-deck-${plan.day}`, "slides", slideDeckFileName(deck), () =>
+                              slideDeckPptxBase64(deck)
+                            )}
+                          >
+                            {busy === `publish-deck-${plan.day}` ? "Publishing…" : "Publish to Drive"}
+                          </Button>
+                        )}
+                        {links[`publish-deck-${plan.day}`] && (
+                          <a href={links[`publish-deck-${plan.day}`]} target="_blank" rel="noreferrer" className="text-sm text-brand-light underline">
+                            View in Drive ↗
+                          </a>
+                        )}
                         <Button
                           variant={deckApproved[plan.day] ? "success" : "primary"}
                           onClick={() => setDeckApproved((a) => ({ ...a, [plan.day]: !a[plan.day] }))}
@@ -318,6 +380,10 @@ function GateBar({
   regenBusy,
   onExport,
   exportLabel,
+  driveEnabled,
+  onPublish,
+  publishBusy,
+  publishLink,
   nextLabel,
   onNext,
 }: {
@@ -328,6 +394,10 @@ function GateBar({
   regenBusy: boolean;
   onExport: () => void;
   exportLabel: string;
+  driveEnabled?: boolean;
+  onPublish?: () => void;
+  publishBusy?: boolean;
+  publishLink?: string;
   nextLabel: string;
   onNext?: () => void;
 }) {
@@ -341,6 +411,16 @@ function GateBar({
         <Button variant="secondary" onClick={onExport}>
           {exportLabel}
         </Button>
+        {driveEnabled && onPublish && (
+          <Button variant="secondary" onClick={onPublish} disabled={publishBusy}>
+            {publishBusy ? "Publishing…" : "Publish to Drive"}
+          </Button>
+        )}
+        {publishLink && (
+          <a href={publishLink} target="_blank" rel="noreferrer" className="text-sm text-brand-light underline">
+            View in Drive ↗
+          </a>
+        )}
         <Button variant={approved ? "success" : "primary"} onClick={onApprove}>
           {approved ? "✓ Approved" : "Approve gate"}
         </Button>

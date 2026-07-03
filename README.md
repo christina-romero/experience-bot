@@ -55,6 +55,31 @@ ANTHROPIC_API_KEY=sk-ant-...
 The key is only ever read in the server-side `/api` routes (`src/lib/anthropic.ts`) — it is
 never shipped to the browser.
 
+## Optional: Publish to Google Drive
+
+When configured, each stage gains a **Publish to Drive** button that uploads the
+generated file and converts it to a **native Google Doc / Google Slides** in a
+Drive output folder (in addition to the `.docx` / `.pptx` download). It uses a
+**Google service account** — no per-user login.
+
+Setup:
+
+1. In [Google Cloud Console](https://console.cloud.google.com), create/select a project.
+2. Enable the **Google Drive API**.
+3. Create a **Service Account**, then **Keys → Add Key → Create new key → JSON** and download it.
+4. Copy the service account email (`…@….iam.gserviceaccount.com`).
+5. In Drive, share the **output folder** with that email as **Editor**, and copy the folder ID (the part of its URL after `/folders/`).
+6. Set two environment variables (locally in `.env.local`, and in Vercel):
+   - `GOOGLE_SERVICE_ACCOUNT_KEY` — the full JSON key contents (secret).
+   - `DRIVE_OUTPUT_FOLDER_ID` — the shared folder's ID.
+
+If your organization blocks service-account JSON keys (`iam.disableServiceAccountKeyCreation`),
+use an OAuth flow instead — open an issue / ask and it can be swapped in.
+
+> Note: this publishes native Google files whose formatting is produced by the
+> app's generators (converted on upload). Byte-identical fills of specific
+> existing Google templates are a further iteration.
+
 ## Deploy (Vercel — shareable URL)
 
 1. Push this folder to a GitHub repo.
