@@ -15,6 +15,7 @@ import {
   ShadingType,
   VerticalAlign,
   PageBreak,
+  TableLayoutType,
 } from "docx";
 import type { ScopeSequence, LessonWeek, LessonPlan, LessonPhase } from "./schemas";
 
@@ -69,11 +70,13 @@ type CellOpts = {
   fill?: string;
   color?: string;
   align?: (typeof AlignmentType)[keyof typeof AlignmentType];
+  columnSpan?: number;
 };
 
 function cell(text: string, opts?: CellOpts) {
   return new TableCell({
     width: opts?.width ? { size: opts.width, type: WidthType.PERCENTAGE } : undefined,
+    columnSpan: opts?.columnSpan,
     shading: opts?.fill ? { fill: opts.fill, type: ShadingType.CLEAR, color: "auto" } : undefined,
     verticalAlign: VerticalAlign.CENTER,
     margins: { top: 50, bottom: 50, left: 90, right: 90 },
@@ -88,12 +91,30 @@ function cell(text: string, opts?: CellOpts) {
   });
 }
 
+// Content width of a Letter page with 1" margins, in DXA (twips).
+const CONTENT_DXA = 9360;
+
+function dxaCols(percents: number[]): number[] {
+  const cols = percents.map((pct) => Math.round((pct / 100) * CONTENT_DXA));
+  cols[cols.length - 1] += CONTENT_DXA - cols.reduce((a, b) => a + b, 0); // absorb rounding drift
+  return cols;
+}
+
+// Fixed-layout table so column widths are honored in Word AND Google Docs.
+function tbl(rows: TableRow[], percents: number[]): Table {
+  return new Table({
+    width: { size: CONTENT_DXA, type: WidthType.DXA },
+    columnWidths: dxaCols(percents),
+    layout: TableLayoutType.FIXED,
+    borders: tableBorders,
+    rows,
+  });
+}
+
 // Full-width banner row, e.g. "WHAT MUST BE TRUE", "LESSON FLOW".
 function banner(text: string, opts?: { fill?: string; color?: string }) {
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    borders: tableBorders,
-    rows: [
+  return tbl(
+    [
       new TableRow({
         children: [
           cell(text, {
@@ -106,15 +127,14 @@ function banner(text: string, opts?: { fill?: string; color?: string }) {
         ],
       }),
     ],
-  });
+    [100]
+  );
 }
 
 // Two-column label / value table.
 function kvTable(rows: [string, string][], labelWidth = 26) {
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    borders: tableBorders,
-    rows: rows.map(
+  return tbl(
+    rows.map(
       ([label, value]) =>
         new TableRow({
           children: [
@@ -123,15 +143,14 @@ function kvTable(rows: [string, string][], labelWidth = 26) {
           ],
         })
     ),
-  });
+    [labelWidth, 100 - labelWidth]
+  );
 }
 
 // Header row (bold, shaded) over a single values row.
 function headedTable(headers: string[], values: string[], widths: number[]) {
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    borders: tableBorders,
-    rows: [
+  return tbl(
+    [
       new TableRow({
         tableHeader: true,
         children: headers.map((hd, i) =>
@@ -142,7 +161,8 @@ function headedTable(headers: string[], values: string[], widths: number[]) {
         children: values.map((v, i) => cell(v, { width: widths[i], align: AlignmentType.CENTER })),
       }),
     ],
-  });
+    widths
+  );
 }
 
 // One phase block, matching the template's per-phase layout.
@@ -154,14 +174,11 @@ function phaseTable(ph: LessonPhase) {
         cell(value, { width: 72 }),
       ],
     });
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    borders: tableBorders,
-    rows: [
+  return tbl(
+    [
       new TableRow({
         children: [
-          cell(ph.name, { bold: true, width: 28, fill: PHASE_FILL, color: WHITE }),
-          cell(ph.minutes, { bold: true, width: 72, fill: PHASE_FILL, color: WHITE }),
+          cell(`${ph.name}  (${ph.minutes} min)`, { bold: true, width: 100, fill: PHASE_FILL, color: WHITE, columnSpan: 2 }),
         ],
       }),
       labeledRow("Slide mapping", ph.slideMapping),
@@ -170,7 +187,8 @@ function phaseTable(ph: LessonPhase) {
       labeledRow("Sentence stems", ph.sentenceStems),
       labeledRow("Guide check-ins and stop points", ph.teacherGuidance),
     ],
-  });
+    [28, 72]
+  );
 }
 
 function buildScopeSequenceDoc(scope: ScopeSequence): Document {
@@ -210,11 +228,7 @@ function buildScopeSequenceDoc(scope: ScopeSequence): Document {
         ],
       })
     );
-    children.push(new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      borders: tableBorders,
-      rows: [header, ...rows],
-    }));
+    children.push(tbl([header, ...rows], [10, 20, 24, 20, 13, 13]));
   }
 
   return new Document({ sections: [{ children }] });
@@ -251,9 +265,9 @@ function planChildren(scope: ScopeSequence, plan: LessonPlan): (Paragraph | Tabl
   out.push(gap());
 
   out.push(headedTable(
-    ["Module", "Week", "Day", "Lesson Length", "Assessment Today"],
-    ["", week, dayNum, "55 minutes", plan.assessment],
-    [16, 12, 12, 24, 36],
+    ["Week", "Day", "Lesson Length"],
+    [week, dayNum, "55 minutes"],
+    [33, 33, 34],
   ));
   out.push(gap());
 
