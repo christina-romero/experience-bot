@@ -37,6 +37,13 @@ function serviceAuth() {
   } catch {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY is not valid JSON. Paste the full contents of the downloaded key file.");
   }
+  if (!credentials.client_email || !credentials.private_key) {
+    throw new Error(
+      "GOOGLE_SERVICE_ACCOUNT_KEY is not a service-account key (it has no client_email / private_key). " +
+        "You may have pasted the OAuth client secret by mistake. Use the JSON from Google Cloud Console -> " +
+        "IAM & Admin -> Service Accounts -> your account -> Keys -> Add key -> Create new key -> JSON."
+    );
+  }
   return new google.auth.GoogleAuth({
     credentials,
     scopes: [
