@@ -152,6 +152,14 @@ export default function Page() {
       setDeckApproved((a) => ({ ...a, [plan.day]: false }));
     }, `deck-${plan.day}`);
 
+  const fillGrTemplate = (plan: LessonPlan) =>
+    guard(async () => {
+      if (!scope) return;
+      const res = await post<{ webViewLink: string }>("/api/gr-deck", { scope, plan });
+      setLinks((l) => ({ ...l, [`grfill-${plan.day}`]: res.webViewLink }));
+      window.open(res.webViewLink, "_blank");
+    }, `grfill-${plan.day}`);
+
   const allPlans: LessonPlan[] = useMemo(
     () =>
       Object.keys(weeks)
@@ -360,7 +368,17 @@ export default function Page() {
                   <h3 className="text-base font-semibold">
                     {plan.day}: {plan.lessonTitle} <span className="text-slate-400">— {plan.lessonType}</span>
                   </h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {driveEnabled && /gradual release/i.test(plan.lessonType) && (
+                      <Button variant="secondary" disabled={busy !== null} onClick={fillGrTemplate(plan)}>
+                        {busy === `grfill-${plan.day}` ? "Filling template…" : "Fill GR template → Drive"}
+                      </Button>
+                    )}
+                    {links[`grfill-${plan.day}`] && (
+                      <a href={links[`grfill-${plan.day}`]} target="_blank" rel="noreferrer" className="text-sm text-brand-light underline">
+                        Open filled deck ↗
+                      </a>
+                    )}
                     {!deck ? (
                       <Button onClick={genDeck(plan)} disabled={busy !== null}>
                         {busy === `deck-${plan.day}` ? "Generating…" : "Generate deck"}

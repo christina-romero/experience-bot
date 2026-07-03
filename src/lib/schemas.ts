@@ -209,6 +209,30 @@ export const lessonWeekSchema = {
   required: ["week", "plans"],
 } as const;
 
+// ---- Gradual Release & Discussion deck: values for the tokenized template ----
+
+export const GR_DECK_FIELDS = [
+  "activity",
+  "donowTime", "donowPrompt", "donowStem", "donowNotes",
+  "stampTime", "stampIdea", "stampStem", "stampNotes",
+  "wsTime", "wsScenario", "wsStem", "wsNotes",
+  "ind1", "ind1Look", "ind2", "ind2Look", "ind3", "ind3Look", "ind4", "ind4Look", "ind5", "ind5Look",
+  "hohTime", "hohScenario", "hohStem", "hohNotes",
+  "itTime", "itTask", "itStem", "itNotes",
+  "reflectQ1", "reflectQ2", "reflectQ3", "reflectNotes",
+  "closureKey", "closureNotes",
+  "attribution",
+] as const;
+
+export type GrDeckTokens = Record<(typeof GR_DECK_FIELDS)[number], string>;
+
+export const grDeckTokensSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: Object.fromEntries(GR_DECK_FIELDS.map((f) => [f, str])),
+  required: [...GR_DECK_FIELDS],
+} as const;
+
 const slideSchema = {
   type: "object",
   additionalProperties: false,

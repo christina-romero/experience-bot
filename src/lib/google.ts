@@ -24,11 +24,11 @@ const TARGET_MIME = {
 
 export type PublishKind = keyof typeof SRC_MIME;
 
-function driveClient() {
+function serviceAuth() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
   if (!raw) {
     throw new Error(
-      "GOOGLE_SERVICE_ACCOUNT_KEY is not set. Add the service-account JSON key as an environment variable to enable Publish to Drive."
+      "GOOGLE_SERVICE_ACCOUNT_KEY is not set. Add the service-account JSON key as an environment variable to enable Drive publishing/filling."
     );
   }
   let credentials: Record<string, unknown>;
@@ -37,11 +37,18 @@ function driveClient() {
   } catch {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY is not valid JSON. Paste the full contents of the downloaded key file.");
   }
-  const auth = new google.auth.GoogleAuth({
+  return new google.auth.GoogleAuth({
     credentials,
-    scopes: ["https://www.googleapis.com/auth/drive"],
+    scopes: [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/presentations",
+      "https://www.googleapis.com/auth/documents",
+    ],
   });
-  return google.drive({ version: "v3", auth });
+}
+
+function driveClient() {
+  return google.drive({ version: "v3", auth: serviceAuth() });
 }
 
 /**
@@ -140,4 +147,70 @@ export async function readDriveFile(
     { responseType: "arraybuffer" }
   );
   return { buffer: Buffer.from(res.data as ArrayBuffer), name };
+}
+
+/** Copy a template file into the output folder and return the copy's id. */
+async function copyTemplate(templateId: string, name: string): Promise<{ id: string; webViewLink: string }> {
+  const folderId = process.env.DRIVE_OUTPUT_FOLDER_ID;
+  if (!folderId) {
+    throw new Error("DRIVE_OUTPUT_FOLDER_ID is not set. Set it to the ID of the Drive folder shared with the service account.");
+  }
+  const drive = driveClient();
+  const res = await drive.files.copy({
+    fileId: templateId,
+    requestBody: { name, parents: [folderId] },
+    supportsAllDrives: true,
+    fields: "id, webViewLink",
+  });
+  if (!res.data.id) throw new Error("Drive did not return an id for the copied template.");
+  return { id: res.data.id, webViewLink: res.data.webViewLink || `https://drive.google.com/file/d/${res.data.id}/view` };
+}
+
+function replaceRequests(replacements: Record<string, string>) {
+  // Each key is a token name (no braces); we match the literal {{TOKEN}}.
+  return Object.entries(replacements).map(([token, value]) => ({
+    replaceAllText: {
+      containsText: { text: `{{${token}}}`, matchCase: true },
+      replaceText: value ?? "",
+    },
+  }));
+}
+
+/**
+ * Fill a Google Slides template: copy it, then replace every {{TOKEN}} (in
+ * slide bodies AND speaker-notes pages) with the provided value. Returns the
+ * new native Google Slides file.
+ */
+export async function fillPresentationFromTemplate(
+  templateId: string,
+  replacements: Record<string, string>,
+  name: string
+): Promise<{ id: string; webViewLink: string }> {
+  const auth = serviceAuth();
+  const copy = await copyTemplate(templateId, name);
+  const slides = google.slides({ version: "v1", auth });
+  await slides.presentations.batchUpdate({
+    presentationId: copy.id,
+    requestBody: { requests: replaceRequests(replacements) },
+  });
+  return { id: copy.id, webViewLink: `https://docs.google.com/presentation/d/${copy.id}/edit` };
+}
+
+/**
+ * Fill a Google Docs template: copy it, then replace every {{TOKEN}} with the
+ * provided value. Returns the new native Google Doc file.
+ */
+export async function fillDocumentFromTemplate(
+  templateId: string,
+  replacements: Record<string, string>,
+  name: string
+): Promise<{ id: string; webViewLink: string }> {
+  const auth = serviceAuth();
+  const copy = await copyTemplate(templateId, name);
+  const docs = google.docs({ version: "v1", auth });
+  await docs.documents.batchUpdate({
+    documentId: copy.id,
+    requestBody: { requests: replaceRequests(replacements) },
+  });
+  return { id: copy.id, webViewLink: `https://docs.google.com/document/d/${copy.id}/edit` };
 }

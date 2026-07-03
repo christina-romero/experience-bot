@@ -60,6 +60,41 @@ export function lessonWeekPrompt(input: { scope: ScopeSequence; week: number }):
   ].join("\n");
 }
 
+/**
+ * Generate the field values for the tokenized Gradual Release & Discussion deck
+ * template. Each field maps 1:1 to a {{TOKEN}} in the template. The *Notes
+ * fields carry teacher facilitation (imperative guidance + engagement strategy +
+ * possible student responses) and land in the slide's speaker notes.
+ */
+export function grDeckTokensPrompt(input: {
+  scope: ScopeSequence;
+  plan: LessonWeek["plans"][number];
+}): string {
+  const rubric = input.scope.rubricText?.trim();
+  return [
+    `Produce the field values for a Gradual Release and Discussion student-facing deck, following the HISD authoring pattern. Ground everything in the approved lesson plan and the provided rubric. Return JSON only.`,
+    `DYAD: ${input.scope.gradeBand} | COMPETENCY: ${input.scope.competency} | TARGET INDICATOR: ${input.plan.rubricIndicator}`,
+    ``,
+    `APPROVED LESSON PLAN:`,
+    JSON.stringify(input.plan, null, 2),
+    ``,
+    rubric ? `AUTHORITATIVE RUBRIC (use its exact 5 indicator names and first-person "I..." look-fors):\n${rubric}\n` : ``,
+    `Field rules:`,
+    `- activity: one sentence naming the experience students do to demonstrate the competency.`,
+    `- Do Now (donow*): an opening scenario/question that activates prior knowledge; donowStem is a sentence stem ending in an ellipsis.`,
+    `- Stamp (stamp*): the key idea to stamp for the day; stampStem is n/a or a quick check stem.`,
+    `- Worked Scenario (ws*): a positive example scenario plus the question "what actions helped this group reach their goal"; wsStem ends in an ellipsis.`,
+    `- Rubric (ind1..ind5 and ind1Look..ind5Look): the five rubric indicator names in order, each with a first-person "I ..." statement of what it looks like. Emphasize the target indicator.`,
+    `- Help or Hurt (hoh*): a scenario asking whether a behavior helped or hurt the team goal and why; hohStem ends in an ellipsis.`,
+    `- Independent Task (it*): the run-it-cold independent task (for example sort scenarios, build a team definition, gallery walk); itStem ends in an ellipsis.`,
+    `- Reflection (reflectQ1..3): three individual written reflection questions.`,
+    `- Closure (closureKey): the one big idea to restate.`,
+    `- attribution: a citation line for any images used, for example "Created using Canva".`,
+    `- Every *Time field is minutes for that slide (for example "4 min"); *Notes fields carry teacher guidance as an imperative move ending with the engagement strategy in parentheses, plus 2 to 4 possible student responses.`,
+    `Style: no em dashes, no semicolons in student-facing text. Plain, concrete, age-appropriate for the dyad.`,
+  ].join("\n");
+}
+
 export function slideDeckPrompt(input: {
   scope: ScopeSequence;
   plan: LessonWeek["plans"][number];
