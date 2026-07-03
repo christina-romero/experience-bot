@@ -32,6 +32,8 @@ const GRADE_BANDS = ["3/4", "5/6", "7/8"];
 
 type Stage = "config" | "scope" | "plans" | "decks";
 
+type DocVal = { text: string; base64?: string; name?: string };
+
 async function post<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!res.ok) {
@@ -41,12 +43,27 @@ async function post<T>(url: string, body: unknown): Promise<T> {
   return res.json();
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve((r.result as string).split(",")[1] || "");
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+function docPayload(d: DocVal) {
+  return d.base64 ? { base64: d.base64, name: d.name } : { text: d.text };
+}
+
 export default function Page() {
   const [stage, setStage] = useState<Stage>("config");
 
   const [competency, setCompetency] = useState(COMPETENCIES[0]);
   const [gradeBand, setGradeBand] = useState(GRADE_BANDS[0]);
-  const [cpcMode, setCpcMode] = useState<"exemplar" | "bespoke">("exemplar");
+  const [ssDoc, setSsDoc] = useState<DocVal>({ text: "" });
+  const [rubricDoc, setRubricDoc] = useState<DocVal>({ text: "" });
+  const [cpcDoc, setCpcDoc] = useState<DocVal>({ text: "" });
 
   const [scope, setScope] = useState<ScopeSequence | null>(null);
   const [scopeApproved, setScopeApproved] = useState(false);
@@ -93,8 +110,14 @@ export default function Page() {
     }, token);
   }
 
-  const gen1 = guard(async () => {
-    const data = await post<ScopeSequence>("/api/generate/scope-sequence", { competency, gradeBand, cpcMode });
+  const parseSS = guard(async () => {
+    const data = await post<ScopeSequence>("/api/parse/scope-sequence", {
+      competency,
+      gradeBand,
+      ss: docPayload(ssDoc),
+      rubric: docPayload(rubricDoc),
+      cpc: docPayload(cpcDoc),
+    });
     setScope(data);
     setScopeApproved(false);
     setWeeks({});
@@ -102,7 +125,7 @@ export default function Page() {
     setDecks({});
     setDeckApproved({});
     setStage("scope");
-  }, "scope");
+  }, "parse");
 
   const genWeek = (week: number) =>
     guard(async () => {
@@ -131,8 +154,8 @@ export default function Page() {
   );
 
   const steps: { key: Stage; label: string; enabled: boolean }[] = [
-    { key: "config", label: "1. Setup", enabled: true },
-    { key: "scope", label: "2. Scope & Sequence", enabled: !!scope },
+    { key: "config", label: "1. Inputs", enabled: true },
+    { key: "scope", label: "2. Review S&S", enabled: !!scope },
     { key: "plans", label: "3. Lesson Plans", enabled: scopeApproved },
     { key: "decks", label: "4. Slide Decks", enabled: Object.values(weekApproved).some(Boolean) },
   ];
@@ -173,12 +196,15 @@ export default function Page() {
         </div>
       )}
 
-      {/* STAGE 1: CONFIG */}
+      {/* STAGE 1: INPUTS */}
       {stage === "config" && (
         <Card className="p-5">
-          <h2 className="mb-1 text-lg font-semibold">Step 1 — Trigger the build</h2>
-          <p className="mb-4 text-sm text-slate-600">Name a competency and grade band. Fixed container: 6 weeks x 5 days x 55 min = 30 lessons, Week 6 CPC.</p>
-          <div className="grid gap-4 md:grid-cols-3">
+          <h2 className="mb-1 text-lg font-semibold">Step 1 — Provide the inputs</h2>
+          <p className="mb-4 text-sm text-slate-600">
+            Choose the competency and dyad, then provide the Scope &amp; Sequence, rubric, and CPC. Upload a .docx or .txt, or paste the
+            text. The app parses your Scope &amp; Sequence, then generates lesson plans one week at a time with your approval before decks.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
               <span className="label">Competency</span>
               <select className="editable" value={competency} onChange={(e) => setCompetency(e.target.value)}>
@@ -195,19 +221,17 @@ export default function Page() {
                 ))}
               </select>
             </label>
-            <label className="block">
-              <span className="label">CPC frame</span>
-              <select className="editable" value={cpcMode} onChange={(e) => setCpcMode(e.target.value as "exemplar" | "bespoke")}>
-                <option value="exemplar">Use proven exemplar (Rescue Mission / Utter Chaos)</option>
-                <option value="bespoke">Design a fresh real-stakes CPC</option>
-              </select>
-            </label>
+          </div>
+          <div className="mt-4 grid gap-3">
+            <DocInput label="Scope & Sequence (required)" hint="Paste the scope & sequence, or upload a .docx / .txt" value={ssDoc} onChange={setSsDoc} />
+            <DocInput label="Rubric" hint="Paste the 5-indicator rubric, or upload a .docx / .txt" value={rubricDoc} onChange={setRubricDoc} />
+            <DocInput label="CPC" hint="Paste the CPC problem statement and structure, or upload a .docx / .txt" value={cpcDoc} onChange={setCpcDoc} />
           </div>
           <div className="mt-5 flex items-center gap-3">
-            <Button onClick={gen1} disabled={busy !== null}>
-              {busy === "scope" ? "Generating…" : "Generate Scope & Sequence"}
+            <Button onClick={parseSS} disabled={busy !== null || !(ssDoc.text.trim() || ssDoc.base64)}>
+              {busy === "parse" ? "Parsing…" : "Parse & Continue"}
             </Button>
-            {busy === "scope" && <Spinner label="Backwards-designing 6 weeks from the CPC…" />}
+            {busy === "parse" && <Spinner label="Reading your scope & sequence…" />}
           </div>
         </Card>
       )}
@@ -219,8 +243,9 @@ export default function Page() {
             title="QC Gate 1 — Scope & Sequence"
             approved={scopeApproved}
             onApprove={() => setScopeApproved((v) => !v)}
-            onRegenerate={gen1}
-            regenBusy={busy === "scope"}
+            onRegenerate={() => setStage("config")}
+            regenerateLabel="Re-upload"
+            regenBusy={false}
             onExport={() => exportScopeSequenceDocx(scope)}
             exportLabel="Download .docx"
             driveEnabled={driveEnabled}
@@ -377,6 +402,7 @@ function GateBar({
   approved,
   onApprove,
   onRegenerate,
+  regenerateLabel,
   regenBusy,
   onExport,
   exportLabel,
@@ -391,6 +417,7 @@ function GateBar({
   approved: boolean;
   onApprove: () => void;
   onRegenerate: () => void;
+  regenerateLabel?: string;
   regenBusy: boolean;
   onExport: () => void;
   exportLabel: string;
@@ -406,7 +433,7 @@ function GateBar({
       <div className="font-semibold">{title}</div>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" onClick={onRegenerate} disabled={regenBusy || approved}>
-          {regenBusy ? "Regenerating…" : "Regenerate"}
+          {regenBusy ? "Regenerating…" : regenerateLabel || "Regenerate"}
         </Button>
         <Button variant="secondary" onClick={onExport}>
           {exportLabel}
@@ -427,5 +454,55 @@ function GateBar({
         {onNext && <Button onClick={onNext}>{nextLabel} →</Button>}
       </div>
     </Card>
+  );
+}
+
+function DocInput({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: DocVal;
+  onChange: (v: DocVal) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+        <label className="cursor-pointer text-xs font-medium text-brand-light underline">
+          {value.name ? value.name : "Upload .docx / .txt"}
+          <input
+            type="file"
+            accept=".docx,.txt,.md"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              const base64 = await fileToBase64(f);
+              onChange({ text: "", base64, name: f.name });
+            }}
+          />
+        </label>
+      </div>
+      {value.name ? (
+        <div className="flex items-center gap-3 text-sm text-slate-600">
+          <span>Using uploaded file.</span>
+          <button className="text-xs text-slate-500 underline" onClick={() => onChange({ text: "" })}>
+            clear
+          </button>
+        </div>
+      ) : (
+        <textarea
+          className="editable"
+          rows={3}
+          placeholder={hint}
+          value={value.text}
+          onChange={(e) => onChange({ text: e.target.value })}
+        />
+      )}
+    </div>
   );
 }

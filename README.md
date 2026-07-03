@@ -11,10 +11,10 @@ Setup  →  Scope & Sequence  →  (Gate 1)  →  Lesson Plans (week by week)  �
 
 ## What it does
 
-- **Step 1 — Scope & Sequence.** Name a competency + grade band + CPC frame. Claude
-  backwards-designs a 6-week / 5-day / 55-minute arc from the Week-6 CPC, one rubric
-  indicator per week, checkpoints on Day 5, CPC in Week 6. Edit any cell, then **Approve
-  Gate 1**. Download as `.docx`.
+- **Step 1 — Inputs.** Choose a competency + dyad, then provide the **Scope & Sequence,
+  rubric, and CPC** (upload a `.docx`/`.txt` or paste text). The app parses your Scope &
+  Sequence into an editable structure; the rubric and CPC travel with it as authoritative
+  grounding for the lesson plans. Review/edit, then **Approve Gate 1**.
 - **Step 2 — Daily lesson plans.** One week at a time (5 × 55-min plans). Each is filled to
   the run-it-cold bar on the matching lesson template (What Must Be True, phases, facilitation
   moves, stems, teacher guidance). Approve each week (**Gate 2**) before the next unlocks.

@@ -36,6 +36,11 @@ export interface ScopeSequence {
   cpcProblemStatement: string;
   overview: string;
   weeks: ScopeWeek[];
+  // Raw user-provided source materials, attached after parsing so they travel
+  // with the scope and ground lesson-plan generation. Not part of the Claude
+  // output schema.
+  rubricText?: string;
+  cpcText?: string;
 }
 
 export interface LessonPhase {
