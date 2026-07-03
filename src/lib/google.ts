@@ -74,3 +74,51 @@ export async function publishToDrive(opts: {
   if (!id) throw new Error("Drive did not return a file id.");
   return { id, webViewLink: webViewLink || `https://drive.google.com/file/d/${id}/view` };
 }
+
+/** Pull the file ID out of a Google Drive / Docs / Slides / Sheets URL. */
+export function driveFileIdFromUrl(url: string): string | null {
+  const byPath = url.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (byPath) return byPath[1];
+  const byQuery = url.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+  if (byQuery) return byQuery[1];
+  // Bare ID pasted directly.
+  const bare = url.trim().match(/^[a-zA-Z0-9_-]{20,}$/);
+  if (bare) return bare[0];
+  return null;
+}
+
+const EXPORT_AS: Record<string, string> = {
+  "application/vnd.google-apps.document": "text/plain",
+  "application/vnd.google-apps.presentation": "text/plain",
+  "application/vnd.google-apps.spreadsheet": "text/csv",
+};
+
+/**
+ * Read a Drive file via the service account. Google-native files (Docs, Slides,
+ * Sheets) are exported to text; anything else is returned as a raw buffer for
+ * the caller to decode (e.g. .docx via mammoth).
+ */
+export async function readDriveFile(fileId: string): Promise<{ text?: string; buffer?: Buffer; name: string }> {
+  const drive = driveClient();
+  let name = "file";
+  let mimeType = "";
+  try {
+    const meta = await drive.files.get({ fileId, fields: "name, mimeType", supportsAllDrives: true });
+    name = meta.data.name || "file";
+    mimeType = meta.data.mimeType || "";
+  } catch {
+    throw new Error(
+      "Could not open that Google Drive file. Make sure the link is correct and the file is shared with the service account (at least Viewer)."
+    );
+  }
+
+  if (EXPORT_AS[mimeType]) {
+    const res = await drive.files.export({ fileId, mimeType: EXPORT_AS[mimeType] }, { responseType: "text" });
+    return { text: String(res.data), name };
+  }
+  const res = await drive.files.get(
+    { fileId, alt: "media", supportsAllDrives: true },
+    { responseType: "arraybuffer" }
+  );
+  return { buffer: Buffer.from(res.data as ArrayBuffer), name };
+}

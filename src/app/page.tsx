@@ -32,7 +32,7 @@ const GRADE_BANDS = ["3/4", "5/6", "7/8"];
 
 type Stage = "config" | "scope" | "plans" | "decks";
 
-type DocVal = { text: string; base64?: string; name?: string };
+type DocVal = { text: string; base64?: string; name?: string; driveUrl?: string };
 
 async function post<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -53,7 +53,13 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 function docPayload(d: DocVal) {
-  return d.base64 ? { base64: d.base64, name: d.name } : { text: d.text };
+  if (d.driveUrl && d.driveUrl.trim()) return { driveUrl: d.driveUrl.trim() };
+  if (d.base64) return { base64: d.base64, name: d.name };
+  return { text: d.text };
+}
+
+function docFilled(d: DocVal): boolean {
+  return !!(d.text.trim() || d.base64 || d.driveUrl?.trim());
 }
 
 export default function Page() {
@@ -228,7 +234,7 @@ export default function Page() {
             <DocInput label="CPC" hint="Paste the CPC problem statement and structure, or upload a .docx / .txt" value={cpcDoc} onChange={setCpcDoc} />
           </div>
           <div className="mt-5 flex items-center gap-3">
-            <Button onClick={parseSS} disabled={busy !== null || !(ssDoc.text.trim() || ssDoc.base64)}>
+            <Button onClick={parseSS} disabled={busy !== null || !docFilled(ssDoc)}>
               {busy === "parse" ? "Parsing…" : "Parse & Continue"}
             </Button>
             {busy === "parse" && <Spinner label="Reading your scope & sequence…" />}
@@ -495,13 +501,22 @@ function DocInput({
           </button>
         </div>
       ) : (
-        <textarea
-          className="editable"
-          rows={3}
-          placeholder={hint}
-          value={value.text}
-          onChange={(e) => onChange({ text: e.target.value })}
-        />
+        <>
+          <input
+            type="url"
+            className="editable mb-2"
+            placeholder="Or paste a Google Drive link (Doc, Slides, or file shared with the service account)"
+            value={value.driveUrl ?? ""}
+            onChange={(e) => onChange({ ...value, driveUrl: e.target.value })}
+          />
+          <textarea
+            className="editable"
+            rows={3}
+            placeholder={hint}
+            value={value.text}
+            onChange={(e) => onChange({ ...value, text: e.target.value })}
+          />
+        </>
       )}
     </div>
   );
