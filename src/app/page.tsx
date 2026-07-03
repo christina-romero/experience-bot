@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { Button, Banner, Card, Spinner } from "@/components/ui";
 import { ScopeSequenceEditor } from "@/components/ScopeSequenceEditor";
 import { LessonWeekEditor } from "@/components/LessonWeekEditor";
@@ -82,6 +83,8 @@ export default function Page() {
 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const { data: session } = useSession();
 
   const [driveEnabled, setDriveEnabled] = useState(false);
   const [links, setLinks] = useState<Record<string, string>>({});
@@ -169,10 +172,20 @@ export default function Page() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
       <header className="mb-5">
-        <h1 className="text-2xl font-bold text-brand">F2 Experience Builder</h1>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h1 className="text-2xl font-bold text-brand">F2 Experience Builder</h1>
+          {session?.user && (
+            <div className="flex items-center gap-3 text-sm text-slate-600">
+              <span>{session.user.email}</span>
+              <button className="text-brand-light underline" onClick={() => signOut({ callbackUrl: "/signin" })}>
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
         <p className="text-sm text-slate-600">
-          Gated, human-QC pipeline. Each stage generates a draft with Claude, you edit it in place, approve the gate, then
-          the next stage unlocks. Export downloadable Google Docs (.docx) and Google Slides (.pptx) at every stage.
+          Human-QC pipeline. Provide your inputs, then each stage generates a draft with Claude, you edit it in place,
+          approve the gate, and the next stage unlocks. Download .docx / .pptx or publish to Drive at every stage.
         </p>
       </header>
 
@@ -505,7 +518,7 @@ function DocInput({
           <input
             type="url"
             className="editable mb-2"
-            placeholder="Or paste a Google Drive link (Doc, Slides, or file shared with the service account)"
+            placeholder="Or paste a Google Drive link (a Doc, Slides, or file in your Drive)"
             value={value.driveUrl ?? ""}
             onChange={(e) => onChange({ ...value, driveUrl: e.target.value })}
           />

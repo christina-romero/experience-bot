@@ -55,6 +55,32 @@ ANTHROPIC_API_KEY=sk-ant-...
 The key is only ever read in the server-side `/api` routes (`src/lib/anthropic.ts`) — it is
 never shipped to the browser.
 
+## Sign in with Google (required — access control)
+
+The whole app is gated behind **Sign in with Google**, and only
+**`2hourlearning.com`** and **`alpha.school`** accounts are allowed (enforced in
+`src/auth.ts`). A signed-in user's **own Drive files** can then be read via a
+pasted Drive link — no sharing needed.
+
+**Setup (one time):**
+
+1. In [Google Cloud Console](https://console.cloud.google.com) (the same project as the service account is fine), open **APIs & Services → OAuth consent screen**:
+   - User type **External**; fill app name + support email.
+   - Add scopes: `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`, and **`.../auth/drive.readonly`**.
+   - **Publishing status: Testing**, and add your teammates' emails as **Test users**. (Testing mode works immediately without Google's app verification; users see a one-time "unverified app" notice. `drive.readonly` is a restricted scope, so opening the app to *everyone* in the domains later would require Google verification — Testing mode is the right call for an internal team.)
+2. **APIs & Services → Credentials → Create Credentials → OAuth client ID → Web application**. Add **Authorized redirect URIs**:
+   - `http://localhost:3000/api/auth/callback/google`
+   - `https://<your-vercel-domain>/api/auth/callback/google`
+3. Copy the **Client ID** and **Client secret**.
+4. Generate a session secret: `npx auth secret` (or `openssl rand -base64 32`).
+5. Set these env vars (local `.env.local` and Vercel):
+   - `AUTH_SECRET` — the generated secret
+   - `AUTH_GOOGLE_ID` — the OAuth client ID
+   - `AUTH_GOOGLE_SECRET` — the OAuth client secret
+   - `AUTH_URL` — in production, your deployed origin (e.g. `https://your-app.vercel.app`)
+
+To change the allowed domains, edit `ALLOWED_DOMAINS` in `src/auth.ts`.
+
 ## Optional: Publish to Google Drive
 
 When configured, each stage gains a **Publish to Drive** button that uploads the

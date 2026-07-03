@@ -4,6 +4,7 @@ import { generateStructured } from "@/lib/anthropic";
 import { scopeSequenceSchema, type ScopeSequence } from "@/lib/schemas";
 import { parseScopeSequencePrompt } from "@/lib/prompts";
 import { readDriveFile, driveFileIdFromUrl } from "@/lib/google";
+import { auth } from "@/auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -18,12 +19,12 @@ async function bufferToText(buffer: Buffer, name: string): Promise<string> {
   return buffer.toString("utf8"); // .txt / .md / best effort
 }
 
-async function extractText(doc: Doc): Promise<string> {
+async function extractText(doc: Doc, userAccessToken?: string): Promise<string> {
   if (!doc) return "";
   if (doc.driveUrl && doc.driveUrl.trim()) {
     const id = driveFileIdFromUrl(doc.driveUrl.trim());
     if (!id) throw new Error("That does not look like a Google Drive file link. Paste a link to a Doc, Slides, or file.");
-    const f = await readDriveFile(id);
+    const f = await readDriveFile(id, userAccessToken);
     if (f.text != null) return f.text;
     if (f.buffer) return bufferToText(f.buffer, f.name);
     return "";
@@ -46,15 +47,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "competency and gradeBand are required." }, { status: 400 });
     }
 
-    const ssText = await extractText(ss);
+    const session = await auth();
+    const userToken = session?.accessToken;
+
+    const ssText = await extractText(ss, userToken);
     if (!ssText.trim()) {
       return NextResponse.json(
-        { error: "Provide a scope & sequence — upload a .docx/.txt file or paste its text." },
+        { error: "Provide a scope & sequence — upload a .docx/.txt file, paste its text, or paste a Drive link." },
         { status: 400 }
       );
     }
-    const rubricText = await extractText(rubric);
-    const cpcText = await extractText(cpc);
+    const rubricText = await extractText(rubric, userToken);
+    const cpcText = await extractText(cpc, userToken);
 
     const prompt = parseScopeSequencePrompt({ competency, gradeBand, ssText, rubricText, cpcText });
     const data = await generateStructured<ScopeSequence>(prompt, scopeSequenceSchema, { maxTokens: 32000 });

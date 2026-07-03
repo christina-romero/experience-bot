@@ -44,6 +44,20 @@ function driveClient() {
   return google.drive({ version: "v3", auth });
 }
 
+/**
+ * Drive client for reads. If a signed-in user's OAuth access token is provided,
+ * read as that user (their own Drive, no sharing needed); otherwise fall back to
+ * the service account (files shared with it).
+ */
+function driveReadClient(userAccessToken?: string) {
+  if (userAccessToken) {
+    const oauth = new google.auth.OAuth2();
+    oauth.setCredentials({ access_token: userAccessToken });
+    return google.drive({ version: "v3", auth: oauth });
+  }
+  return driveClient();
+}
+
 export async function publishToDrive(opts: {
   name: string;
   base64: string;
@@ -98,8 +112,11 @@ const EXPORT_AS: Record<string, string> = {
  * Sheets) are exported to text; anything else is returned as a raw buffer for
  * the caller to decode (e.g. .docx via mammoth).
  */
-export async function readDriveFile(fileId: string): Promise<{ text?: string; buffer?: Buffer; name: string }> {
-  const drive = driveClient();
+export async function readDriveFile(
+  fileId: string,
+  userAccessToken?: string
+): Promise<{ text?: string; buffer?: Buffer; name: string }> {
+  const drive = driveReadClient(userAccessToken);
   let name = "file";
   let mimeType = "";
   try {
@@ -108,7 +125,9 @@ export async function readDriveFile(fileId: string): Promise<{ text?: string; bu
     mimeType = meta.data.mimeType || "";
   } catch {
     throw new Error(
-      "Could not open that Google Drive file. Make sure the link is correct and the file is shared with the service account (at least Viewer)."
+      userAccessToken
+        ? "Could not open that Google Drive file. Check the link and that your account has access to it."
+        : "Could not open that Google Drive file. Make sure the link is correct and the file is shared with the service account (at least Viewer)."
     );
   }
 
