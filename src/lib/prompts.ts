@@ -55,6 +55,7 @@ export function lessonWeekPrompt(input: { scope: ScopeSequence; week: number }):
     `- materials: exact student + teacher materials (low cost, reusable).`,
     `- phases: the ordered phases for this lesson type with minutes that sum to ~55, a slideMapping label per phase, run-it-cold steps, a named facilitation move, sentence stems, and teacher guidance (imperative, includes the engagement strategy).`,
     `- For a CPC or Live Performance day: include the CPC Launch sign-off (launch day) or the guide no-fly list + individual-evidence capture + binary live test (performance days), tied to the provided CPC.`,
+    `- performanceCapture: for a CPC or Live Performance day, fill cpcLaunch (the launch and sign-off), challengeConstraint (the challenge and its one hard constraint), noFlyList (the guide no-fly list), individualEvidence (how each individual student's evidence is captured and scored), and binaryTest (the pass/fail condition observed live). For any non-CPC, non-performance day, set ALL five fields to an empty string.`,
     `- assessment matches the S&S row.`,
     `Style: no em dashes, no semicolons in student-facing text. Return the LessonWeek JSON only.`,
   ].join("\n");

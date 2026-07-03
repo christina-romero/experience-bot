@@ -12,6 +12,7 @@ function phaseColor(phaseRaw: string, kind: string): string {
   if (phase.includes("guided")) return "474F99"; // purple
   if (phase.includes("independent") || phase.includes("human advantage")) return "6DB83D"; // light green
   if (phase.includes("reflection") || phase.includes("closure")) return "6DB83D";
+  if (phase.includes("routine")) return "E8B93A"; // yellow
   if (phase.includes("cpc")) return "1F4E79";
   if (kind === "title" || kind === "attribution" || kind === "materials") return "1F4E79"; // brand blue
   return "1F4E79";

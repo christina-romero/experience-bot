@@ -289,6 +289,22 @@ function planChildren(scope: ScopeSequence, plan: LessonPlan): (Paragraph | Tabl
   out.push(banner("CHECKPOINT / CPC CAPTURE"));
   out.push(kvTable([["Assessment Today", plan.assessment]]));
 
+  // CPC / Live Performance special sections — only when the plan carries them.
+  const pc = plan.performanceCapture;
+  if (pc) {
+    const pcRows: [string, string][] = [];
+    if (pc.cpcLaunch) pcRows.push(["CPC Launch & sign-off", pc.cpcLaunch]);
+    if (pc.challengeConstraint) pcRows.push(["The Challenge (hard constraint)", pc.challengeConstraint]);
+    if (pc.noFlyList) pcRows.push(["Guide no-fly list", pc.noFlyList]);
+    if (pc.individualEvidence) pcRows.push(["Individual evidence capture", pc.individualEvidence]);
+    if (pc.binaryTest) pcRows.push(["Binary live test (pass/fail)", pc.binaryTest]);
+    if (pcRows.length) {
+      out.push(gap());
+      out.push(banner("CPC / LIVE PERFORMANCE CAPTURE"));
+      out.push(kvTable(pcRows));
+    }
+  }
+
   return out;
 }
 

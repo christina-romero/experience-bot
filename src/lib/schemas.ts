@@ -71,6 +71,14 @@ export interface LessonPlan {
   materials: { student: string; teacher: string };
   phases: LessonPhase[];
   assessment: string;
+  // Filled only for CPC / Live Performance days; empty strings otherwise.
+  performanceCapture: {
+    cpcLaunch: string;
+    challengeConstraint: string;
+    noFlyList: string;
+    individualEvidence: string;
+    binaryTest: string;
+  };
 }
 
 export interface LessonWeek {
@@ -192,10 +200,23 @@ const lessonPlanSchema = {
     },
     phases: { type: "array", items: lessonPhaseSchema },
     assessment: str,
+    performanceCapture: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        cpcLaunch: str,
+        challengeConstraint: str,
+        noFlyList: str,
+        individualEvidence: str,
+        binaryTest: str,
+      },
+      required: ["cpcLaunch", "challengeConstraint", "noFlyList", "individualEvidence", "binaryTest"],
+    },
   },
   required: [
     "day", "lessonTitle", "lessonType", "competency", "rubricIndicator", "lo",
     "experienceObjective", "connection", "whatMustBeTrue", "materials", "phases", "assessment",
+    "performanceCapture",
   ],
 } as const;
 
