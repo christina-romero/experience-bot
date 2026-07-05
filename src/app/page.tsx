@@ -224,9 +224,6 @@ export default function Page() {
           Human-QC pipeline. Provide your inputs, then each stage generates a draft with Claude, you edit it in place,
           approve the gate, and the next stage unlocks. Download .docx / .pptx or publish to Drive at every stage.
         </p>
-        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
-          Review all generated content before use.
-        </div>
       </header>
 
       {/* Stepper */}
