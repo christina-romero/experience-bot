@@ -32,6 +32,7 @@ export interface ScopeWeek {
 export interface ScopeSequence {
   competency: string;
   gradeBand: string;
+  experienceName: string; // detected title of the experience/unit, or "" if none
   cpcFrame: string;
   cpcProblemStatement: string;
   overview: string;
@@ -138,6 +139,7 @@ export const scopeSequenceSchema = {
   properties: {
     competency: str,
     gradeBand: str,
+    experienceName: str,
     cpcFrame: str,
     cpcProblemStatement: str,
     overview: str,
@@ -156,7 +158,7 @@ export const scopeSequenceSchema = {
       },
     },
   },
-  required: ["competency", "gradeBand", "cpcFrame", "cpcProblemStatement", "overview", "weeks"],
+  required: ["competency", "gradeBand", "experienceName", "cpcFrame", "cpcProblemStatement", "overview", "weeks"],
 } as const;
 
 const lessonPhaseSchema = {

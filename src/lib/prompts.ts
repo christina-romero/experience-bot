@@ -24,6 +24,7 @@ export function parseScopeSequencePrompt(input: {
     `- Align each rubricIndicator to the indicator names in the PROVIDED RUBRIC below.`,
     `- Set cpcFrame and cpcProblemStatement from the PROVIDED CPC below (or the S&S if it states them); otherwise use an empty string.`,
     `- Set competency and gradeBand to the provided values. Set overview to a 1 to 2 sentence summary of the provided Scope & Sequence.`,
+    `- Set experienceName to the title or name of the experience/unit if the document states one, otherwise an empty string. Do not invent one.`,
     ``,
     input.rubricText.trim() ? `PROVIDED RUBRIC:\n${input.rubricText}\n` : `No rubric was provided.\n`,
     input.cpcText.trim() ? `PROVIDED CPC:\n${input.cpcText}\n` : `No CPC was provided.\n`,

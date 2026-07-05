@@ -16,6 +16,7 @@ import {
   lessonWeekFileName,
 } from "@/lib/export-docx";
 import { exportSlideDeckPptx, slideDeckPptxBase64, slideDeckFileName } from "@/lib/export-pptx";
+import { canonicalLessonType } from "@/lib/template-registry";
 
 const COMPETENCIES = [
   "Collaboration & Teamwork",
@@ -70,6 +71,7 @@ export default function Page() {
   const [gradeBand, setGradeBand] = useState(GRADE_BANDS[0]);
   const [sources, setSources] = useState<DocVal[]>([{ text: "" }]);
   const [sourceReport, setSourceReport] = useState<SourceReport | null>(null);
+  const [previewWeek, setPreviewWeek] = useState(1);
 
   const [scope, setScope] = useState<ScopeSequence | null>(null);
   const [scopeApproved, setScopeApproved] = useState(false);
@@ -303,6 +305,8 @@ export default function Page() {
           </div>
 
           {sourceReport && <SourceFindings report={sourceReport} />}
+
+          {scope && <ReadyToGenerate scope={scope} week={previewWeek} onWeek={setPreviewWeek} />}
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <Button onClick={analyzeSources} disabled={busy !== null || !sources.some(docFilled)}>
@@ -698,6 +702,87 @@ function SourceFindings({ report }: { report: SourceReport }) {
           Scope &amp; Sequence is required to continue — add it above and analyze again.
         </div>
       )}
+    </div>
+  );
+}
+
+const TEMPLATE_LABEL: Record<string, string> = {
+  gradual_release: "Gradual Release",
+  skills_lab: "Skills Lab",
+  simulation_synthesis: "Simulation & Synthesis",
+  cpc: "CPC",
+};
+
+// Read-only "Ready to Generate" preview built from the parsed scope. No per-item
+// approval — the writer just reviews and clicks Continue.
+function ReadyToGenerate({
+  scope,
+  week,
+  onWeek,
+}: {
+  scope: ScopeSequence;
+  week: number;
+  onWeek: (w: number) => void;
+}) {
+  const wk = scope.weeks.find((w) => w.week === week) ?? scope.weeks[0];
+  const templateFor = (lessonType: string) =>
+    TEMPLATE_LABEL[canonicalLessonType(lessonType)] ?? "Standard (.docx)";
+  return (
+    <div className="mt-4 rounded-md border border-slate-200 p-4 text-sm">
+      <div className="mb-2 font-semibold">Ready to Generate</div>
+      <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+        <div>
+          <span className="text-slate-500">Competency:</span> {scope.competency}
+        </div>
+        <div>
+          <span className="text-slate-500">Dyad:</span> {scope.gradeBand}
+        </div>
+        {scope.experienceName?.trim() && (
+          <div>
+            <span className="text-slate-500">Experience:</span> {scope.experienceName}
+          </div>
+        )}
+        <div>
+          <span className="text-slate-500">Weeks detected:</span> {scope.weeks.length}
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-xs uppercase tracking-wide text-slate-500">Week</span>
+        <select
+          className="editable max-w-[7rem]"
+          value={week}
+          onChange={(e) => onWeek(Number(e.target.value))}
+        >
+          {scope.weeks.map((w) => (
+            <option key={w.week} value={w.week}>
+              Week {w.week}
+            </option>
+          ))}
+        </select>
+        <span className="text-slate-500">— {wk?.days.length ?? 0} days</span>
+      </div>
+
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-left text-xs">
+          <thead className="text-slate-500">
+            <tr>
+              <th className="py-1 pr-3 font-medium">Day</th>
+              <th className="py-1 pr-3 font-medium">Lesson type</th>
+              <th className="py-1 font-medium">Template</th>
+            </tr>
+          </thead>
+          <tbody>
+            {wk?.days.map((d, i) => (
+              <tr key={i} className="border-t border-slate-100">
+                <td className="py-1 pr-3 whitespace-nowrap">{d.day}</td>
+                <td className="py-1 pr-3">{d.lessonType}</td>
+                <td className="py-1 whitespace-nowrap">{templateFor(d.lessonType)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
