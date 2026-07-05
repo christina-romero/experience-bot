@@ -105,14 +105,64 @@ export async function publishToDrive(opts: {
 
 /** Pull the file ID out of a Google Drive / Docs / Slides / Sheets URL. */
 export function driveFileIdFromUrl(url: string): string | null {
-  const byPath = url.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
-  if (byPath) return byPath[1];
-  const byQuery = url.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
-  if (byQuery) return byQuery[1];
-  // Bare ID pasted directly.
-  const bare = url.trim().match(/^[a-zA-Z0-9_-]{20,}$/);
-  if (bare) return bare[0];
+  return parseDriveUrl(url)?.id ?? null;
+}
+
+export type DriveTarget = { id: string; kind: "file" | "folder" };
+
+/**
+ * Parse any supported Google URL into an id + kind. Accepts Docs, Slides,
+ * Sheets, Drive file links, folder links, open?id= links, and bare ids. Returns
+ * null only for malformed or non-Google URLs.
+ */
+export function parseDriveUrl(url: string): DriveTarget | null {
+  const u = (url || "").trim();
+  const folder = u.match(/\/folders\/([a-zA-Z0-9_-]{15,})/);
+  if (folder) return { id: folder[1], kind: "folder" };
+  const byPath = u.match(/\/d\/([a-zA-Z0-9_-]{15,})/); // document/presentation/spreadsheets/file /d/<id>
+  if (byPath) return { id: byPath[1], kind: "file" };
+  const byQuery = u.match(/[?&]id=([a-zA-Z0-9_-]{15,})/); // open?id=<id>
+  if (byQuery) return { id: byQuery[1], kind: "file" };
+  const bare = u.match(/^[a-zA-Z0-9_-]{20,}$/); // bare id
+  if (bare) return { id: bare[0], kind: "file" };
   return null;
+}
+
+// File types we can turn into text; anything else in a folder is ignored.
+const READABLE_MIME = new Set([
+  "application/vnd.google-apps.document",
+  "application/vnd.google-apps.presentation",
+  "application/vnd.google-apps.spreadsheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "text/plain",
+  "text/markdown",
+]);
+
+/** List the readable files directly inside a Drive folder (unsupported files ignored). */
+export async function listFolderFiles(
+  folderId: string,
+  userAccessToken?: string
+): Promise<{ id: string; name: string; mimeType: string }[]> {
+  const drive = driveReadClient(userAccessToken);
+  const out: { id: string; name: string; mimeType: string }[] = [];
+  let pageToken: string | undefined;
+  do {
+    const res = await drive.files.list({
+      q: `'${folderId}' in parents and trashed = false`,
+      fields: "nextPageToken, files(id, name, mimeType)",
+      pageSize: 200,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+      pageToken,
+    });
+    for (const f of res.data.files ?? []) {
+      if (f.id && f.mimeType && READABLE_MIME.has(f.mimeType)) {
+        out.push({ id: f.id, name: f.name || "file", mimeType: f.mimeType });
+      }
+    }
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+  return out;
 }
 
 const EXPORT_AS: Record<string, string> = {

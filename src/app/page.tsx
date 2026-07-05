@@ -624,7 +624,7 @@ function SourceRow({
           <input
             type="url"
             className="editable mb-2"
-            placeholder="Paste a Google Doc link"
+            placeholder="Paste a Google Doc, Slides, Sheet, file, or folder link"
             value={value.driveUrl ?? ""}
             onChange={(e) => onChange({ ...value, driveUrl: e.target.value })}
           />

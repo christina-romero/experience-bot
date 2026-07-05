@@ -3,7 +3,7 @@ import mammoth from "mammoth";
 import { generateStructured } from "@/lib/anthropic";
 import { scopeSequenceSchema, type ScopeSequence } from "@/lib/schemas";
 import { parseScopeSequencePrompt } from "@/lib/prompts";
-import { readDriveFile, driveFileIdFromUrl } from "@/lib/google";
+import { readDriveFile, parseDriveUrl, listFolderFiles } from "@/lib/google";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -43,19 +43,35 @@ async function bufferToText(buffer: Buffer, name: string): Promise<string> {
   return buffer.toString("utf8");
 }
 
-async function extractText(doc: Src, userToken?: string): Promise<{ text: string; name: string }> {
-  const fallbackName = doc.name || (doc.driveUrl ? "Drive link" : "Pasted text");
+async function readFileToText(id: string, userToken?: string): Promise<{ text: string; name: string }> {
+  const f = await readDriveFile(id, userToken);
+  if (f.text != null) return { text: f.text, name: f.name };
+  if (f.buffer) return { text: await bufferToText(f.buffer, f.name), name: f.name };
+  return { text: "", name: f.name };
+}
+
+/**
+ * Expand one source into one or more { name, text } items. A Drive folder link
+ * expands into every readable file inside it; any other supported Google URL,
+ * upload, or pasted text yields a single item.
+ */
+async function expandSource(doc: Src, userToken?: string): Promise<{ name: string; text: string }[]> {
   if (doc.driveUrl && doc.driveUrl.trim()) {
-    const id = driveFileIdFromUrl(doc.driveUrl.trim());
-    if (!id) throw new Error(`That does not look like a Google Drive link: ${doc.driveUrl}`);
-    const f = await readDriveFile(id, userToken);
-    if (f.text != null) return { text: f.text, name: f.name };
-    if (f.buffer) return { text: await bufferToText(f.buffer, f.name), name: f.name };
-    return { text: "", name: f.name };
+    const target = parseDriveUrl(doc.driveUrl.trim());
+    if (!target) throw new Error(`That does not look like a Google link: ${doc.driveUrl}`);
+    if (target.kind === "folder") {
+      const files = await listFolderFiles(target.id, userToken);
+      const out: { name: string; text: string }[] = [];
+      for (const file of files) out.push(await readFileToText(file.id, userToken));
+      return out;
+    }
+    return [await readFileToText(target.id, userToken)];
   }
-  if (doc.text && doc.text.trim()) return { text: doc.text.trim(), name: fallbackName };
-  if (doc.base64) return { text: await bufferToText(Buffer.from(doc.base64, "base64"), doc.name || ""), name: fallbackName };
-  return { text: "", name: fallbackName };
+  if (doc.text && doc.text.trim()) return [{ name: doc.name || "Pasted text", text: doc.text.trim() }];
+  if (doc.base64) {
+    return [{ name: doc.name || "Uploaded file", text: await bufferToText(Buffer.from(doc.base64, "base64"), doc.name || "") }];
+  }
+  return [];
 }
 
 const classifySchema = {
@@ -112,11 +128,14 @@ export async function POST(req: Request) {
     const session = await auth();
     const userToken = session?.accessToken;
 
-    // 1. Extract text for every source.
+    // 1. Extract text for every source (a folder expands into its files).
     const extracted: { index: number; name: string; text: string }[] = [];
-    for (let i = 0; i < sources.length; i++) {
-      const { text, name } = await extractText(sources[i], userToken);
-      if (text.trim()) extracted.push({ index: i, name, text });
+    let idx = 0;
+    for (const src of sources) {
+      const items = await expandSource(src, userToken);
+      for (const it of items) {
+        if (it.text.trim()) extracted.push({ index: idx++, name: it.name, text: it.text });
+      }
     }
     if (extracted.length === 0) {
       return NextResponse.json({ error: "No readable text was found in the sources provided." }, { status: 400 });
