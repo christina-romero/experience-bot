@@ -9,31 +9,43 @@ import {
   fillPresentationFromTemplate,
 } from "@/lib/google";
 import {
-  extractPlaceholders,
+  analyzeTemplate,
   buildPlaceholderSchema,
   templateMatchCheck,
   toReplacements,
   toToken,
 } from "@/lib/template-schema";
 import { gateFacilitation, usableFacilitation } from "@/lib/facilitation-gate";
+import { resolveTemplateId, type TemplateKind } from "@/lib/template-registry";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-/** Layer 3 prompt: one JSON object keyed by the template's placeholder tokens. */
+/**
+ * Layer 3 prompt: one JSON object keyed by the template's placeholder tokens.
+ * The bot acts as an experiential-learning expert, not just a form filler:
+ *  - the Scope & Sequence is the source of truth for WHAT the day teaches
+ *  - the template is the source of truth for the OUTPUT structure (these keys)
+ *  - the Genome + facilitation quality bar improve HOW the day is taught
+ */
 function structuredLessonPrompt(placeholders: string[], scope: ScopeSequence, plan: LessonPlan): string {
   const cpc = scope.cpcText?.trim() || scope.cpcProblemStatement;
   return [
-    `Produce ONE JSON object for a lesson, using ONLY these template placeholder tokens as keys. Return JSON only.`,
+    `You are an experiential-learning designer producing ONE JSON object for a single day's lesson. Use ONLY these template placeholder tokens as keys. Return JSON only.`,
     `Keys (use every one, exactly as written, including the braces):`,
     placeholders.map(toToken).join(", "),
     ``,
-    `Fill each field with content for THIS lesson, grounded in the approved plan below. Match each field to what its name implies (for example {{STUDENT_TASK}} is the student task, {{FACILITATOR_MOVES}} is the guide moves, {{MATERIALS}} is the materials). If a field does not apply, use an empty string. Do NOT invent keys that are not in the list.`,
+    `OUTPUT STRUCTURE (template = source of truth): fill each field with the content its name implies (for example {{STUDENT_TASK}} is the student task, {{FACILITATOR_MOVES}} is the guide moves, {{MATERIALS}} is the materials). If a field does not apply, use an empty string. Do NOT invent keys that are not in the list. Every field has exactly one destination.`,
+    `Enumerated fields are a repeating collection: {{PHASE_1_*}}, {{PHASE_2_*}}, ... map to the 1st, 2nd, ... phase of the plan in order (same for any other N_ numbered group). Fill only as many as the plan has and leave any trailing ones as an empty string.`,
+    ``,
+    `WHAT THE DAY TEACHES (Scope & Sequence = source of truth, do not override): the daily objective, lesson type, competency indicator, CPC progression, assessment target, and the required sequence come from the plan below. Preserve this instructional intent exactly. You may generate richer daily content when the plan is only a thin outline, but you must NOT invent a new arc, a new CPC, or a different rubric priority.`,
+    ``,
+    `HOW TO TEACH IT (raise the experiential quality): design for student autonomy, movement, collaboration, active practice (real at-bats on the competency, not passive listening), reflection, and engagement. Every facilitation must be run-it-cold: a concrete student task, clear guide moves, realistic timing, and available materials (flag any that are missing). Facilitations will be independently validated, so make them strong.`,
     ``,
     `COMPETENCY: ${scope.competency} | DYAD: ${scope.gradeBand} | RUBRIC INDICATOR: ${plan.rubricIndicator}`,
     scope.rubricText?.trim() ? `AUTHORITATIVE RUBRIC:\n${scope.rubricText}\n` : ``,
     cpc ? `AUTHORITATIVE CPC:\n${cpc}\n` : ``,
-    `APPROVED LESSON PLAN:`,
+    `APPROVED LESSON PLAN (the day from the Scope & Sequence):`,
     JSON.stringify(plan, null, 2),
     ``,
     `Style: no em dashes, no semicolons in student-facing text. Plain, concrete, age-appropriate for the dyad.`,
@@ -45,18 +57,35 @@ function structuredLessonPrompt(placeholders: string[], scope: ScopeSequence, pl
 export async function POST(req: Request) {
   try {
     const { templateUrl, kind, scope, plan } = (await req.json()) as {
-      templateUrl: string;
+      templateUrl?: string;
       kind?: "doc" | "slides";
       scope: ScopeSequence;
       plan: LessonPlan;
     };
-    if (!templateUrl || !scope || !plan) {
-      return NextResponse.json({ error: "templateUrl, scope, and plan are required." }, { status: 400 });
+    if (!scope || !plan) {
+      return NextResponse.json({ error: "scope and plan are required." }, { status: 400 });
     }
+    const wantKind: TemplateKind = kind === "slides" ? "slides" : "doc";
 
-    const templateId = driveFileIdFromUrl(templateUrl.trim());
-    if (!templateId) {
-      return NextResponse.json({ error: "That does not look like a Google Doc / Slides link." }, { status: 400 });
+    // Step 3: select the template deterministically. An explicit link overrides;
+    // otherwise resolve the lesson type through the registry.
+    let templateId: string | null;
+    if (templateUrl && templateUrl.trim()) {
+      templateId = driveFileIdFromUrl(templateUrl.trim());
+      if (!templateId) {
+        return NextResponse.json({ error: "That does not look like a Google Doc / Slides link." }, { status: 400 });
+      }
+    } else {
+      const r = resolveTemplateId(plan.lessonType, wantKind);
+      if (!r.id) {
+        return NextResponse.json(
+          {
+            error: `No ${wantKind} template is registered for lesson type "${plan.lessonType}" (key "${r.key}"). Add it to TEMPLATE_REGISTRY_JSON or pass templateUrl. Registered keys: ${r.known.join(", ") || "none"}.`,
+          },
+          { status: 400 }
+        );
+      }
+      templateId = r.id;
     }
 
     const session = await auth();
@@ -70,7 +99,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const placeholders = extractPlaceholders(file.text);
+    const { placeholders, duplicates } = analyzeTemplate(file.text);
     if (placeholders.length === 0) {
       return NextResponse.json(
         { error: "No {{PLACEHOLDER}} fields were found in that template." },
@@ -109,23 +138,33 @@ export async function POST(req: Request) {
     const check = templateMatchCheck(placeholders, generated);
 
     // ---- Render into a copied template (best-effort; validation stands either way) ----
+    // Every placeholder must be unique with exactly one destination; refuse to
+    // render an ambiguous template until the author makes duplicates unique.
     let filled: { id: string; webViewLink: string } | null = null;
     let fillError: string | undefined;
-    try {
-      const name = `${scope.competency}_${scope.gradeBand}_${plan.day}`.replace(/[/\\:*?"<>|]/g, "-");
-      const replacements = toReplacements(check.mapped);
-      filled =
-        kind === "slides"
-          ? await fillPresentationFromTemplate(templateId, replacements, name)
-          : await fillDocumentFromTemplate(templateId, replacements, name);
-    } catch (e) {
-      fillError = e instanceof Error ? e.message : "Template render failed.";
+    if (duplicates.length) {
+      fillError = `Template has duplicate placeholders (each must be unique): ${duplicates.map(toToken).join(", ")}`;
+    } else {
+      try {
+        const name = `${scope.competency}_${scope.gradeBand}_${plan.day}`.replace(/[/\\:*?"<>|]/g, "-");
+        const replacements = toReplacements(check.mapped);
+        filled =
+          wantKind === "slides"
+            ? await fillPresentationFromTemplate(templateId, replacements, name)
+            : await fillDocumentFromTemplate(templateId, replacements, name);
+      } catch (e) {
+        fillError = e instanceof Error ? e.message : "Template render failed.";
+      }
     }
 
     return NextResponse.json({
       placeholders,
       object: generated,
-      templateMatchCheck: { unmapped: check.unmapped, missing: check.missing },
+      templateMatchCheck: {
+        unmapped: check.unmapped,
+        missing: check.missing,
+        duplicates: duplicates.map(toToken),
+      },
       facilitation,
       file: filled,
       fillError,

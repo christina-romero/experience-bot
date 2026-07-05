@@ -12,16 +12,26 @@ const PLACEHOLDER_RE = /\{\{\s*([A-Z0-9_]+)\s*\}\}/g;
 
 /** Every unique placeholder in the template, in first-seen order (bare names). */
 export function extractPlaceholders(text: string): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
+  return analyzeTemplate(text).placeholders;
+}
+
+/**
+ * Analyze the template's placeholders. Each placeholder must be unique with
+ * exactly one destination; a placeholder that appears more than once is a
+ * template authoring error (reported as a duplicate). Repeating collections
+ * such as lesson phases are authored as enumerated unique fields
+ * ({{PHASE_1_STEPS}}, {{PHASE_2_STEPS}}, ...), so they never repeat a name.
+ */
+export function analyzeTemplate(text: string): { placeholders: string[]; duplicates: string[] } {
+  const order: string[] = [];
+  const counts = new Map<string, number>();
   for (const m of text.matchAll(PLACEHOLDER_RE)) {
     const name = m[1];
-    if (!seen.has(name)) {
-      seen.add(name);
-      out.push(name);
-    }
+    if (!counts.has(name)) order.push(name);
+    counts.set(name, (counts.get(name) ?? 0) + 1);
   }
-  return out;
+  const duplicates = order.filter((n) => (counts.get(n) ?? 0) > 1);
+  return { placeholders: order, duplicates };
 }
 
 /** The full "{{NAME}}" token form used as JSON keys in the structured object. */
