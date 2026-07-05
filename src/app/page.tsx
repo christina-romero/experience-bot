@@ -818,19 +818,16 @@ function MatchCheck({ r }: { r: TemplateFillResult }) {
       )}
       {c.missing.length > 0 && <div className="text-amber-700">Missing: {c.missing.join(", ")}</div>}
       {c.unmapped.length > 0 && <div className="text-slate-500">Unmapped (ignored): {c.unmapped.join(", ")}</div>}
-      {r.facilitation.length > 0 && (
+      {r.facilitation.some((f) => f.verdict !== "PASS") && (
         <div className="text-slate-600">
-          Facilitation:{" "}
-          {r.facilitation.map((f) => (
-            <span
-              key={f.field}
-              className={
-                f.verdict === "PASS" ? "text-green-700" : f.verdict === "REVISE" ? "text-amber-700" : "text-red-600"
-              }
-            >
-              {f.field}={f.verdict}{" "}
-            </span>
-          ))}
+          Facilitation needs review:{" "}
+          {r.facilitation
+            .filter((f) => f.verdict !== "PASS")
+            .map((f) => (
+              <span key={f.field} className={f.verdict === "REVISE" ? "text-amber-700" : "text-red-600"}>
+                {f.field} ({f.verdict === "REVISE" ? "adapted" : "replaced"}){" "}
+              </span>
+            ))}
         </div>
       )}
     </div>

@@ -42,6 +42,7 @@ export interface ScopeSequence {
   // output schema.
   rubricText?: string;
   cpcText?: string;
+  facilitationText?: string; // classified Facilitation Library source, if provided
 }
 
 export interface LessonPhase {

@@ -39,6 +39,7 @@ export function lessonWeekPrompt(input: { scope: ScopeSequence; week: number }):
   const wkJson = wk ? JSON.stringify(wk, null, 2) : "(week not found)";
   const rubric = input.scope.rubricText?.trim();
   const cpc = input.scope.cpcText?.trim() || input.scope.cpcProblemStatement;
+  const facilitation = input.scope.facilitationText?.trim();
   return [
     `Produce the Step 2 daily lesson plans for WEEK ${input.week} of a user-provided Scope & Sequence.`,
     `COMPETENCY: ${input.scope.competency} | GRADE BAND: ${input.scope.gradeBand} | CPC FRAME: ${input.scope.cpcFrame}`,
@@ -50,6 +51,13 @@ export function lessonWeekPrompt(input: { scope: ScopeSequence; week: number }):
     ``,
     rubric ? `AUTHORITATIVE RUBRIC (use these exact indicators and descriptors):\n${rubric}\n` : ``,
     cpc ? `AUTHORITATIVE CPC (what the arc builds toward):\n${cpc}\n` : ``,
+    facilitation ? `FACILITATION LIBRARY (draw from this FIRST):\n${facilitation}\n` : ``,
+    `FACILITATION SELECTION RULE for each phase's facilitation move, in order:`,
+    `1. First search the provided Facilitation Library for a move that matches the competency, dyad, lesson type, objective, and rubric indicator.`,
+    `2. Use that move as written if it meets the run-it-cold quality bar (concrete student task, clear guide moves, realistic timing, available materials).`,
+    `3. If a library move is close but imperfect, adapt it and prefix its name with "Adapted:".`,
+    `4. Only if no usable library move exists, write a new competency-aligned facilitation and flag it as newly written.`,
+    `Prefer existing library content over inventing new moves. ${facilitation ? "" : "No Facilitation Library was provided, so write new competency-aligned moves and flag them as newly written."}`,
     `Produce exactly one lesson plan per day in this week, each filled to the run-it-cold bar on the template for its lessonType:`,
     `- lo, experienceObjective, connection (forward link) consistent with the S&S row and the rubric indicator it targets.`,
     `- whatMustBeTrue: give a SPECIFIC checkable mechanic for each of readWrite, noOptOut, urgency, groupings (no general statements).`,
