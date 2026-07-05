@@ -643,7 +643,14 @@ function SourceRow({
 type SourceReport = {
   scope: ScopeSequence | null;
   sources: { name: string; category: string }[];
-  found: { scopeSequence: boolean; cpc: boolean; rubric: boolean; genome: boolean; notes: boolean };
+  found: {
+    scopeSequence: boolean;
+    cpc: boolean;
+    rubric: boolean;
+    genome: boolean;
+    facilitationLibrary: boolean;
+    notes: boolean;
+  };
   missing: string[];
 };
 
@@ -651,17 +658,19 @@ const CATEGORY_LABEL: Record<string, string> = {
   scope_sequence: "Scope & Sequence",
   cpc: "CPC",
   rubric: "Rubric",
-  genome: "Genome reference",
-  notes: "Supporting notes",
-  unknown: "Unclassified",
+  genome: "Future2 Experience Genome",
+  facilitation_library: "Facilitation Library",
+  notes: "Supporting Notes",
+  unknown: "Unknown",
 };
 
 const FOUND_LABEL: [keyof SourceReport["found"], string][] = [
   ["scopeSequence", "Scope & Sequence"],
-  ["rubric", "Rubric"],
   ["cpc", "CPC"],
-  ["genome", "Genome references"],
-  ["notes", "Supporting notes"],
+  ["rubric", "Rubric"],
+  ["genome", "Genome"],
+  ["facilitationLibrary", "Facilitation Library"],
+  ["notes", "Supporting Notes"],
 ];
 
 // The internal source pack, shown back to the user: what each source was, what
@@ -677,16 +686,16 @@ function SourceFindings({ report }: { report: SourceReport }) {
           </li>
         ))}
       </ul>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        {FOUND_LABEL.map(([key, label]) => (
-          <span key={key} className={report.found[key] ? "text-green-700" : "text-slate-400"}>
-            {report.found[key] ? "✓" : "•"} {label}
-          </span>
+      <div className="space-y-0.5 text-xs">
+        {FOUND_LABEL.filter(([key]) => report.found[key]).map(([key, label]) => (
+          <div key={key} className="text-green-700">
+            ✓ {label} found
+          </div>
         ))}
       </div>
       {report.missing.length > 0 && (
         <div className="mt-2 text-amber-700">
-          Still needed: {report.missing.join(", ")} — add it above and analyze again.
+          Scope &amp; Sequence is required to continue — add it above and analyze again.
         </div>
       )}
     </div>

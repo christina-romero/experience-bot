@@ -17,8 +17,23 @@ export const maxDuration = 300;
  */
 
 type Src = { text?: string; base64?: string; name?: string; driveUrl?: string };
-type Category = "scope_sequence" | "cpc" | "rubric" | "genome" | "notes" | "unknown";
-const CATEGORIES: Category[] = ["scope_sequence", "cpc", "rubric", "genome", "notes", "unknown"];
+type Category =
+  | "scope_sequence"
+  | "cpc"
+  | "rubric"
+  | "genome"
+  | "facilitation_library"
+  | "notes"
+  | "unknown";
+const CATEGORIES: Category[] = [
+  "scope_sequence",
+  "cpc",
+  "rubric",
+  "genome",
+  "facilitation_library",
+  "notes",
+  "unknown",
+];
 
 async function bufferToText(buffer: Buffer, name: string): Promise<string> {
   if (name.toLowerCase().endsWith(".docx")) {
@@ -71,6 +86,7 @@ function classifyPrompt(items: { index: number; name: string; snippet: string }[
     `- cpc: a Culminating Performance Challenge (CPC) problem statement or structure.`,
     `- rubric: a competency rubric with indicators and levels.`,
     `- genome: Future2 Experience Genome references or experiential-design patterns.`,
+    `- facilitation_library: a library or list of facilitation moves, protocols, routines, or engagement strategies.`,
     `- notes: supporting notes or anything else useful but not the above.`,
     `- unknown: cannot tell from the content.`,
     ``,
@@ -116,7 +132,7 @@ export async function POST(req: Request) {
 
     // 3. Assemble the internal source pack.
     const byCat: Record<Category, string[]> = {
-      scope_sequence: [], cpc: [], rubric: [], genome: [], notes: [], unknown: [],
+      scope_sequence: [], cpc: [], rubric: [], genome: [], facilitation_library: [], notes: [], unknown: [],
     };
     const perSource = extracted.map((e) => {
       const category = catByIndex.get(e.index) ?? "unknown";
@@ -133,6 +149,7 @@ export async function POST(req: Request) {
       cpc: !!cpcText.trim(),
       rubric: !!rubricText.trim(),
       genome: byCat.genome.length > 0,
+      facilitationLibrary: byCat.facilitation_library.length > 0,
       notes: byCat.notes.length > 0,
     };
 
