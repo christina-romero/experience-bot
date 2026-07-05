@@ -208,7 +208,7 @@ export default function Page() {
     <div className="mx-auto max-w-6xl px-4 py-6">
       <header className="mb-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <h1 className="text-2xl font-bold text-brand">F2 Experience Builder</h1>
+          <h1 className="text-2xl font-bold text-brand">Build an Experience</h1>
           {session?.user && (
             <div className="flex items-center gap-3 text-sm text-slate-600">
               <span>{session.user.email}</span>
