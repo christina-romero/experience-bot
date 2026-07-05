@@ -44,6 +44,7 @@ export interface ScopeSequence {
   rubricText?: string;
   cpcText?: string;
   facilitationText?: string; // classified Facilitation Library source, if provided
+  genomeText?: string; // classified Future2 Experience Genome source, if provided
 }
 
 export interface LessonPhase {

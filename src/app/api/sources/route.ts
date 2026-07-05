@@ -165,6 +165,7 @@ export async function POST(req: Request) {
       scope.rubricText = rubricText;
       scope.cpcText = cpcText;
       scope.facilitationText = join(byCat.facilitation_library);
+      scope.genomeText = join(byCat.genome);
     } else {
       missing.push("Scope & Sequence");
     }

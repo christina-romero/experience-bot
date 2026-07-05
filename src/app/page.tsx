@@ -768,7 +768,7 @@ function ReadyToGenerate({
           <thead className="text-slate-500">
             <tr>
               <th className="py-1 pr-3 font-medium">Day</th>
-              <th className="py-1 pr-3 font-medium">Lesson type</th>
+              <th className="py-1 pr-3 font-medium">Design Model</th>
               <th className="py-1 font-medium">Template</th>
             </tr>
           </thead>
