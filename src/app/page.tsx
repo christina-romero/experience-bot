@@ -68,9 +68,8 @@ export default function Page() {
 
   const [competency, setCompetency] = useState(COMPETENCIES[0]);
   const [gradeBand, setGradeBand] = useState(GRADE_BANDS[0]);
-  const [ssDoc, setSsDoc] = useState<DocVal>({ text: "" });
-  const [rubricDoc, setRubricDoc] = useState<DocVal>({ text: "" });
-  const [cpcDoc, setCpcDoc] = useState<DocVal>({ text: "" });
+  const [sources, setSources] = useState<DocVal[]>([{ text: "" }]);
+  const [sourceReport, setSourceReport] = useState<SourceReport | null>(null);
 
   const [scope, setScope] = useState<ScopeSequence | null>(null);
   const [scopeApproved, setScopeApproved] = useState(false);
@@ -121,22 +120,19 @@ export default function Page() {
     }, token);
   }
 
-  const parseSS = guard(async () => {
-    const data = await post<ScopeSequence>("/api/parse/scope-sequence", {
-      competency,
-      gradeBand,
-      ss: docPayload(ssDoc),
-      rubric: docPayload(rubricDoc),
-      cpc: docPayload(cpcDoc),
-    });
-    setScope(data);
-    setScopeApproved(false);
-    setWeeks({});
-    setWeekApproved({});
-    setDecks({});
-    setDeckApproved({});
-    setStage("scope");
-  }, "parse");
+  const analyzeSources = guard(async () => {
+    const payloads = sources.filter(docFilled).map(docPayload);
+    const res = await post<SourceReport>("/api/sources", { competency, gradeBand, sources: payloads });
+    setSourceReport(res);
+    if (res.scope) {
+      setScope(res.scope);
+      setScopeApproved(false);
+      setWeeks({});
+      setWeekApproved({});
+      setDecks({});
+      setDeckApproved({});
+    }
+  }, "analyze");
 
   const genWeek = (week: number) =>
     guard(async () => {
@@ -260,10 +256,11 @@ export default function Page() {
       {/* STAGE 1: INPUTS */}
       {stage === "config" && (
         <Card className="p-5">
-          <h2 className="mb-1 text-lg font-semibold">Step 1 — Provide the inputs</h2>
+          <h2 className="mb-1 text-lg font-semibold">Step 1 — Experience Sources</h2>
           <p className="mb-4 text-sm text-slate-600">
-            Choose the competency and dyad, then provide the Scope &amp; Sequence, rubric, and CPC. Upload a .docx or .txt, or paste the
-            text. The app parses your Scope &amp; Sequence, then generates lesson plans one week at a time with your approval before decks.
+            Choose the competency and dyad, then drop in everything you have — Scope &amp; Sequence, CPC, rubric, Future2
+            Genome references, and notes — as Google Doc links, files, or pasted text, in any mix. The app sorts each
+            source for you, shows what it found, and asks only for what is missing.
           </p>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
@@ -283,16 +280,40 @@ export default function Page() {
               </select>
             </label>
           </div>
-          <div className="mt-4 grid gap-3">
-            <DocInput label="Scope & Sequence (required)" hint="Paste the scope & sequence, or upload a .docx / .txt" value={ssDoc} onChange={setSsDoc} />
-            <DocInput label="Rubric" hint="Paste the 5-indicator rubric, or upload a .docx / .txt" value={rubricDoc} onChange={setRubricDoc} />
-            <DocInput label="CPC" hint="Paste the CPC problem statement and structure, or upload a .docx / .txt" value={cpcDoc} onChange={setCpcDoc} />
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="label">Experience Sources</span>
+              <button
+                className="text-xs font-medium text-brand-light underline"
+                onClick={() => setSources((s) => [...s, { text: "" }])}
+              >
+                + Add source
+              </button>
+            </div>
+            <div className="grid gap-3">
+              {sources.map((src, i) => (
+                <SourceRow
+                  key={i}
+                  value={src}
+                  onChange={(v) => setSources((s) => s.map((x, j) => (j === i ? v : x)))}
+                  onRemove={sources.length > 1 ? () => setSources((s) => s.filter((_, j) => j !== i)) : undefined}
+                />
+              ))}
+            </div>
           </div>
-          <div className="mt-5 flex items-center gap-3">
-            <Button onClick={parseSS} disabled={busy !== null || !docFilled(ssDoc)}>
-              {busy === "parse" ? "Parsing…" : "Parse & Continue"}
+
+          {sourceReport && <SourceFindings report={sourceReport} />}
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <Button onClick={analyzeSources} disabled={busy !== null || !sources.some(docFilled)}>
+              {busy === "analyze" ? "Analyzing…" : "Analyze sources"}
             </Button>
-            {busy === "parse" && <Spinner label="Reading your scope & sequence…" />}
+            {busy === "analyze" && <Spinner label="Sorting and reading your sources…" />}
+            {scope && (
+              <Button variant="primary" onClick={() => setStage("scope")}>
+                Continue to Review S&amp;S →
+              </Button>
+            )}
           </div>
         </Card>
       )}
@@ -557,21 +578,19 @@ function GateBar({
   );
 }
 
-function DocInput({
-  label,
-  hint,
+// One Experience Source: a Google Doc link, an uploaded file, or pasted text.
+function SourceRow({
   value,
   onChange,
+  onRemove,
 }: {
-  label: string;
-  hint: string;
   value: DocVal;
   onChange: (v: DocVal) => void;
+  onRemove?: () => void;
 }) {
   return (
     <div className="rounded-lg border border-slate-200 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
         <label className="cursor-pointer text-xs font-medium text-brand-light underline">
           {value.name ? value.name : "Upload .docx / .txt"}
           <input
@@ -586,6 +605,11 @@ function DocInput({
             }}
           />
         </label>
+        {onRemove && (
+          <button className="text-xs text-slate-400 underline" onClick={onRemove}>
+            remove
+          </button>
+        )}
       </div>
       {value.name ? (
         <div className="flex items-center gap-3 text-sm text-slate-600">
@@ -595,13 +619,75 @@ function DocInput({
           </button>
         </div>
       ) : (
-        <textarea
-          className="editable"
-          rows={3}
-          placeholder={hint}
-          value={value.text}
-          onChange={(e) => onChange({ ...value, text: e.target.value })}
-        />
+        <>
+          <input
+            type="url"
+            className="editable mb-2"
+            placeholder="Paste a Google Doc link"
+            value={value.driveUrl ?? ""}
+            onChange={(e) => onChange({ ...value, driveUrl: e.target.value })}
+          />
+          <textarea
+            className="editable"
+            rows={2}
+            placeholder="…or paste text"
+            value={value.text}
+            onChange={(e) => onChange({ ...value, text: e.target.value })}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+type SourceReport = {
+  scope: ScopeSequence | null;
+  sources: { name: string; category: string }[];
+  found: { scopeSequence: boolean; cpc: boolean; rubric: boolean; genome: boolean; notes: boolean };
+  missing: string[];
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  scope_sequence: "Scope & Sequence",
+  cpc: "CPC",
+  rubric: "Rubric",
+  genome: "Genome reference",
+  notes: "Supporting notes",
+  unknown: "Unclassified",
+};
+
+const FOUND_LABEL: [keyof SourceReport["found"], string][] = [
+  ["scopeSequence", "Scope & Sequence"],
+  ["rubric", "Rubric"],
+  ["cpc", "CPC"],
+  ["genome", "Genome references"],
+  ["notes", "Supporting notes"],
+];
+
+// The internal source pack, shown back to the user: what each source was, what
+// categories were found, and what is still missing.
+function SourceFindings({ report }: { report: SourceReport }) {
+  return (
+    <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+      <div className="mb-1 font-semibold">What we found</div>
+      <ul className="mb-2 space-y-0.5 text-slate-600">
+        {report.sources.map((s, i) => (
+          <li key={i}>
+            {s.name} → <span className="font-medium">{CATEGORY_LABEL[s.category] ?? s.category}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        {FOUND_LABEL.map(([key, label]) => (
+          <span key={key} className={report.found[key] ? "text-green-700" : "text-slate-400"}>
+            {report.found[key] ? "✓" : "•"} {label}
+          </span>
+        ))}
+      </div>
+      {report.missing.length > 0 && (
+        <div className="mt-2 text-amber-700">
+          Still needed: {report.missing.join(", ")} — add it above and analyze again.
+        </div>
       )}
     </div>
   );
