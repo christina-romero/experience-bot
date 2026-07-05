@@ -388,14 +388,14 @@ export default function Page() {
                         <Button variant="ghost" onClick={genDeck(plan)} disabled={busy !== null || deckApproved[plan.day]}>
                           Regenerate
                         </Button>
-                        <Button variant="secondary" onClick={() => exportSlideDeckPptx(deck)}>
+                        <Button variant="secondary" onClick={() => exportSlideDeckPptx(deck, scope)}>
                           Download .pptx
                         </Button>
                         {driveEnabled && (
                           <Button
                             variant="secondary"
                             disabled={busy !== null}
-                            onClick={publish(`publish-deck-${plan.day}`, "slides", slideDeckFileName(deck), () =>
+                            onClick={publish(`publish-deck-${plan.day}`, "slides", slideDeckFileName(deck, scope), () =>
                               slideDeckPptxBase64(deck)
                             )}
                           >

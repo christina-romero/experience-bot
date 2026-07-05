@@ -19,6 +19,16 @@ import {
 } from "docx";
 import type { ScopeSequence, LessonWeek, LessonPlan, LessonPhase } from "./schemas";
 
+// Keep spaces and "&" (both valid in filenames); turn path separators into "-"
+// and drop the characters Windows/macOS disallow.
+function safeName(s: string): string {
+  return (s || "")
+    .replace(/[/\\]/g, "-")
+    .replace(/[:*?"<>|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -235,7 +245,7 @@ function buildScopeSequenceDoc(scope: ScopeSequence): Document {
 }
 
 export function scopeSequenceFileName(scope: ScopeSequence) {
-  return `F2_ScopeSequence_${scope.competency.replace(/[^a-z0-9]+/gi, "_")}_${scope.gradeBand.replace("/", "-")}`;
+  return `${safeName(scope.competency)}_${safeName(scope.gradeBand)}_Scope & Sequence`;
 }
 
 export async function exportScopeSequenceDocx(scope: ScopeSequence) {
@@ -341,7 +351,7 @@ function buildLessonWeekDoc(scope: ScopeSequence, wk: LessonWeek): Document {
 }
 
 export function lessonWeekFileName(scope: ScopeSequence, wk: LessonWeek) {
-  return `F2_LessonPlans_Week${wk.week}_${scope.competency.replace(/[^a-z0-9]+/gi, "_")}_${scope.gradeBand.replace("/", "-")}`;
+  return `${safeName(scope.competency)}_${safeName(scope.gradeBand)}_Week ${wk.week}_Daily Plans`;
 }
 
 export async function exportLessonWeekDocx(scope: ScopeSequence, wk: LessonWeek) {

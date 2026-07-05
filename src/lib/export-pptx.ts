@@ -124,12 +124,24 @@ function buildDeck(deck: SlideDeck): PptxGenJS {
   return pptx;
 }
 
-export function slideDeckFileName(deck: SlideDeck) {
-  return `F2_Deck_${deck.day.replace(/[^a-z0-9]+/gi, "_")}_${deck.lessonType.replace(/[^a-z0-9]+/gi, "_")}`;
+function safeName(s: string): string {
+  return (s || "")
+    .replace(/[/\\]/g, "-")
+    .replace(/[:*?"<>|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-export async function exportSlideDeckPptx(deck: SlideDeck) {
-  await buildDeck(deck).writeFile({ fileName: `${slideDeckFileName(deck)}.pptx` });
+type DeckMeta = { competency: string; gradeBand: string };
+
+export function slideDeckFileName(deck: SlideDeck, meta: DeckMeta) {
+  const week = deck.day.match(/week\s*(\d+)/i)?.[1] ?? "";
+  const day = deck.day.match(/day\s*(\d+)/i)?.[1] ?? "";
+  return `${safeName(meta.competency)}_${safeName(meta.gradeBand)}_Week ${week}_Day ${day}_Slides`;
+}
+
+export async function exportSlideDeckPptx(deck: SlideDeck, meta: DeckMeta) {
+  await buildDeck(deck).writeFile({ fileName: `${slideDeckFileName(deck, meta)}.pptx` });
 }
 
 export async function slideDeckPptxBase64(deck: SlideDeck): Promise<string> {
