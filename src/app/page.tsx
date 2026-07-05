@@ -81,6 +81,8 @@ export default function Page() {
   const [decks, setDecks] = useState<Record<string, SlideDeck>>({});
   const [deckApproved, setDeckApproved] = useState<Record<string, boolean>>({});
 
+  const [tmpl, setTmpl] = useState<Record<string, TemplateFillResult>>({});
+
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -159,6 +161,14 @@ export default function Page() {
       setLinks((l) => ({ ...l, [`grfill-${plan.day}`]: res.webViewLink }));
       window.open(res.webViewLink, "_blank");
     }, `grfill-${plan.day}`);
+
+  const fillTemplate = (plan: LessonPlan, kind: "doc" | "slides") =>
+    guard(async () => {
+      if (!scope) return;
+      const res = await post<TemplateFillResult>("/api/template-fill", { scope, plan, kind });
+      setTmpl((t) => ({ ...t, [plan.day]: res }));
+      if (res.file?.webViewLink) window.open(res.file.webViewLink, "_blank");
+    }, `tmpl-${plan.day}`);
 
   const allPlans: LessonPlan[] = useMemo(
     () =>
@@ -344,11 +354,37 @@ export default function Page() {
                 </div>
                 {busy === `week-${wk.week}` && <Spinner label={`Writing 5 run-it-cold plans for Week ${wk.week}…`} />}
                 {generated && (
-                  <LessonWeekEditor
-                    week={generated}
-                    readOnly={weekApproved[wk.week]}
-                    onChange={(w) => setWeeks((prev) => ({ ...prev, [wk.week]: w }))}
-                  />
+                  <>
+                    <LessonWeekEditor
+                      week={generated}
+                      readOnly={weekApproved[wk.week]}
+                      onChange={(w) => setWeeks((prev) => ({ ...prev, [wk.week]: w }))}
+                    />
+                    <div className="mt-4 space-y-2">
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Template fill + Match Check
+                      </h4>
+                      {generated.plans.map((plan) => (
+                        <div key={plan.day} className="rounded-md border border-slate-200 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm">
+                              <span className="font-medium">{plan.day}</span>
+                              <span className="text-slate-400"> — {plan.lessonType}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button variant="secondary" disabled={busy !== null} onClick={fillTemplate(plan, "doc")}>
+                                {busy === `tmpl-${plan.day}` ? "Validating…" : "Validate + fill doc"}
+                              </Button>
+                              <Button variant="ghost" disabled={busy !== null} onClick={fillTemplate(plan, "slides")}>
+                                Fill deck
+                              </Button>
+                            </div>
+                          </div>
+                          {tmpl[plan.day] && <MatchCheck r={tmpl[plan.day]} />}
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </Card>
             );
@@ -539,6 +575,56 @@ function DocInput({
           value={value.text}
           onChange={(e) => onChange({ ...value, text: e.target.value })}
         />
+      )}
+    </div>
+  );
+}
+
+type TemplateFillResult = {
+  placeholders: string[];
+  object: Record<string, string>;
+  templateMatchCheck: { unmapped: string[]; missing: string[]; duplicates: string[] };
+  facilitation: { field: string; verdict: string; reasons: string }[];
+  file: { id: string; webViewLink: string } | null;
+  fillError?: string;
+};
+
+// Template Match Check panel: what mapped, what is missing / unmapped / duplicated,
+// and each facilitation's verdict — the pre-export flag list.
+function MatchCheck({ r }: { r: TemplateFillResult }) {
+  const c = r.templateMatchCheck;
+  const filled = r.placeholders.length - c.missing.length;
+  return (
+    <div className="mt-3 space-y-1 border-t border-slate-100 pt-2 text-xs">
+      {r.file?.webViewLink && (
+        <a href={r.file.webViewLink} target="_blank" rel="noreferrer" className="text-brand-light underline">
+          Open filled template ↗
+        </a>
+      )}
+      {r.fillError && <div className="text-amber-700">Not rendered: {r.fillError}</div>}
+      <div className="text-slate-600">
+        {filled}/{r.placeholders.length} fields filled · {c.missing.length} missing · {c.unmapped.length} unmapped ·{" "}
+        {c.duplicates.length} duplicate
+      </div>
+      {c.duplicates.length > 0 && (
+        <div className="text-red-600">Duplicates (make each unique): {c.duplicates.join(", ")}</div>
+      )}
+      {c.missing.length > 0 && <div className="text-amber-700">Missing: {c.missing.join(", ")}</div>}
+      {c.unmapped.length > 0 && <div className="text-slate-500">Unmapped (ignored): {c.unmapped.join(", ")}</div>}
+      {r.facilitation.length > 0 && (
+        <div className="text-slate-600">
+          Facilitation:{" "}
+          {r.facilitation.map((f) => (
+            <span
+              key={f.field}
+              className={
+                f.verdict === "PASS" ? "text-green-700" : f.verdict === "REVISE" ? "text-amber-700" : "text-red-600"
+              }
+            >
+              {f.field}={f.verdict}{" "}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );

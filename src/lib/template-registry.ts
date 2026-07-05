@@ -16,8 +16,20 @@ type Entry = { doc?: string; slides?: string };
 
 const DEFAULT_REGISTRY: Record<string, Entry> = {
   gradual_release: {
-    doc: "159FRZGQbsJOuUI15mSH4S6e3Wd2XlANd-6hkjVAtCZk",
-    slides: "1v-MudrimTKjfYI3YOtIuiaVZVmhLpfgIICsFqlalszs",
+    doc: "1698JdbcACDRhxOHeY1O1Sq9xncNPkunCF8jHLVtMadM",
+    slides: "1eIFCWtXJglHISAXhSPyyrmu54XnoRgl24C_eFhqAK68",
+  },
+  skills_lab: {
+    doc: "1NhQx0pgVLynkTeqKTDMdbUlnG_GfNFVStOte8VhjOZI",
+    slides: "13Ofi31f2dZaClOUonWKA3VmukKggHUMCdn6OBWktEvM",
+  },
+  simulation_synthesis: {
+    doc: "1Xb80JBGyvUkSTGtaiHPI8Nt2DQfd8E1wQoMC7I3RX9g",
+    slides: "1EWi2VXEFdWDW1w8Aa9n-o-Z94AaW-aD7H944qDf0YLo",
+  },
+  cpc: {
+    doc: "1zZYXSa5wMMbsgGwkxZE8XknH6cuI-YTzjyhdiFNTqFY",
+    slides: "1_MDLSKslKKJ5PSkUSkGIWG_sSW5-PUmb8qIiFwN4RtM",
   },
 };
 
@@ -32,17 +44,16 @@ function loadRegistry(): Record<string, Entry> {
   }
 }
 
-/** Normalize a messy lesson-type label to one canonical registry key. */
+/**
+ * Normalize a messy lesson-type label to one canonical registry key. Keys match
+ * the registered templates: gradual_release, skills_lab, simulation_synthesis, cpc.
+ */
 export function canonicalLessonType(lessonType: string): string {
   const t = (lessonType || "").toLowerCase();
   if (t.includes("gradual release")) return "gradual_release";
-  if (t.includes("simulation") && t.includes("invisible")) return "simulation_invisible";
-  if (t.includes("simulation") && t.includes("performance")) return "simulation_performance";
-  if (t.includes("simulation")) return "simulation";
+  if (t.includes("simulation")) return "simulation_synthesis";
   if (t.includes("skills lab") || t.includes("checkpoint")) return "skills_lab";
-  if (t.includes("live performance")) return "live_performance";
-  if (t.includes("cpc")) return "cpc";
-  if (t.includes("direct")) return "direct_instruction";
+  if (t.includes("cpc") || t.includes("live performance")) return "cpc";
   return t.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "unknown";
 }
 
