@@ -162,12 +162,33 @@ export default function Page() {
       window.open(res.webViewLink, "_blank");
     }, `grfill-${plan.day}`);
 
-  const fillTemplate = (plan: LessonPlan, kind: "doc" | "slides") =>
+  // Run the Template Match Check and render into the Google template when that is
+  // configured. This NEVER leaves the user empty-handed: if native rendering is
+  // not configured or fails, it falls back to the reliable .docx export.
+  const fillTemplate = (plan: LessonPlan, week: LessonWeek) =>
     guard(async () => {
       if (!scope) return;
-      const res = await post<TemplateFillResult>("/api/template-fill", { scope, plan, kind });
+      let res: TemplateFillResult;
+      try {
+        res = await post<TemplateFillResult>("/api/template-fill", { scope, plan, kind: "doc" });
+      } catch (e) {
+        const why = e instanceof Error ? e.message : "Template check unavailable";
+        res = {
+          placeholders: [],
+          object: {},
+          templateMatchCheck: { unmapped: [], missing: [], duplicates: [] },
+          facilitation: [],
+          file: null,
+          fillError: `${why} — downloaded .docx instead.`,
+        };
+      }
       setTmpl((t) => ({ ...t, [plan.day]: res }));
-      if (res.file?.webViewLink) window.open(res.file.webViewLink, "_blank");
+      if (res.file?.webViewLink) {
+        window.open(res.file.webViewLink, "_blank");
+      } else {
+        // Native render unavailable -> guaranteed artifact via the working export.
+        await exportLessonWeekDocx(scope, week);
+      }
     }, `tmpl-${plan.day}`);
 
   const allPlans: LessonPlan[] = useMemo(
@@ -205,6 +226,9 @@ export default function Page() {
           Human-QC pipeline. Provide your inputs, then each stage generates a draft with Claude, you edit it in place,
           approve the gate, and the next stage unlocks. Download .docx / .pptx or publish to Drive at every stage.
         </p>
+        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+          Review all generated content before use.
+        </div>
       </header>
 
       {/* Stepper */}
@@ -362,27 +386,30 @@ export default function Page() {
                     />
                     <div className="mt-4 space-y-2">
                       <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Template fill + Match Check
+                        Template Match Check
                       </h4>
-                      {generated.plans.map((plan) => (
-                        <div key={plan.day} className="rounded-md border border-slate-200 p-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="text-sm">
-                              <span className="font-medium">{plan.day}</span>
-                              <span className="text-slate-400"> — {plan.lessonType}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button variant="secondary" disabled={busy !== null} onClick={fillTemplate(plan, "doc")}>
-                                {busy === `tmpl-${plan.day}` ? "Validating…" : "Validate + fill doc"}
+                      {generated.plans.map((plan) => {
+                        const beta = !/gradual\s*release/i.test(plan.lessonType);
+                        return (
+                          <div key={plan.day} className="rounded-md border border-slate-200 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-sm">
+                                <span className="font-medium">{plan.day}</span>
+                                <span className="text-slate-400"> — {plan.lessonType}</span>
+                                {beta && (
+                                  <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                                    Beta
+                                  </span>
+                                )}
+                              </div>
+                              <Button variant="secondary" disabled={busy !== null} onClick={fillTemplate(plan, generated)}>
+                                {busy === `tmpl-${plan.day}` ? "Checking…" : "Match Check + fill"}
                               </Button>
-                              <Button variant="ghost" disabled={busy !== null} onClick={fillTemplate(plan, "slides")}>
-                                Fill deck
-                              </Button>
                             </div>
+                            {tmpl[plan.day] && <MatchCheck r={tmpl[plan.day]} />}
                           </div>
-                          {tmpl[plan.day] && <MatchCheck r={tmpl[plan.day]} />}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
