@@ -776,7 +776,10 @@ function ReadyToGenerate({
             {wk?.days.map((d, i) => (
               <tr key={i} className="border-t border-slate-100">
                 <td className="py-1 pr-3 whitespace-nowrap">{d.day}</td>
-                <td className="py-1 pr-3">{d.lessonType}</td>
+                <td className="py-1 pr-3">
+                  {d.lessonType}
+                  {d.lessonTypeInferred && <span className="ml-1 text-slate-400">(inferred)</span>}
+                </td>
                 <td className="py-1 whitespace-nowrap">{templateFor(d.lessonType)}</td>
               </tr>
             ))}

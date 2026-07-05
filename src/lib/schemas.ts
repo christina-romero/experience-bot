@@ -12,6 +12,7 @@ export interface ScopeDay {
   day: string; // "Week 1, Day 1"
   lessonTitle: string;
   lessonType: string;
+  lessonTypeInferred: boolean; // true when the type was inferred, not stated in the S&S
   lo: string; // Learning Objective (the competency skill)
   experienceObjective: string;
   activity: string;
@@ -119,6 +120,7 @@ const scopeDaySchema = {
     day: str,
     lessonTitle: str,
     lessonType: str,
+    lessonTypeInferred: { type: "boolean" },
     lo: str,
     experienceObjective: str,
     activity: str,
@@ -129,7 +131,7 @@ const scopeDaySchema = {
     aiStage: str,
   },
   required: [
-    "day", "lessonTitle", "lessonType", "lo", "experienceObjective", "activity",
+    "day", "lessonTitle", "lessonType", "lessonTypeInferred", "lo", "experienceObjective", "activity",
     "rubricIndicator", "assessment", "connection", "materialsCost", "aiStage",
   ],
 } as const;
