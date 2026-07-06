@@ -12,10 +12,9 @@
 
 import { CURRICULUM_DICTIONARY, WHAT_MUST_BE_TRUE, AUTHORING_PATTERN, CPC_TEMPLATE } from "./knowledge";
 import { GENOME_TEXT } from "./genome-data";
-import { hasRegistryEntries } from "./template-registry";
 import { readSpreadsheetWorkbook } from "./google";
 
-// The Genome workbook id (from the shared sheet); override via env if it moves.
+// The Genome workbook id (used ONLY for opt-in live sync); override via env.
 const GENOME_SHEET_ID = process.env.GENOME_SHEET_ID || "1ZOzJNh0JBc6Iw6glUmFVtqOpoUZ2OfZm";
 
 let genomeCache: string | null = null;
@@ -42,31 +41,31 @@ function indexWorkbook(sheets: { sheetName: string; rows: string[][] }[]): strin
   return blocks.join("\n\n");
 }
 
-/** Load + index the Genome (bundled text wins; otherwise read every worksheet). Cached. */
+/**
+ * Load the Genome. The bundled local export is authoritative and always the
+ * fallback — no Sheets API or network is required. Live sync is OPT-IN
+ * (GENOME_LIVE_SYNC=1) and best-effort: if it fails for any reason, we silently
+ * use the local export. This never throws, so generation is never blocked.
+ */
 async function loadGenome(userAccessToken?: string): Promise<string> {
-  if (genomeCache) return genomeCache;
+  if (genomeCache != null) return genomeCache;
 
-  const bundled = GENOME_TEXT.trim();
-  if (bundled) {
-    genomeCache = bundled;
-    return bundled;
+  const local = GENOME_TEXT.trim();
+
+  if (process.env.GENOME_LIVE_SYNC === "1") {
+    try {
+      const indexed = indexWorkbook(await readSpreadsheetWorkbook(GENOME_SHEET_ID, userAccessToken));
+      if (indexed.trim()) {
+        genomeCache = indexed;
+        return indexed;
+      }
+    } catch {
+      // Live Genome unavailable -> fall back to the local export below.
+    }
   }
 
-  let sheets: { sheetName: string; rows: string[][] }[];
-  try {
-    sheets = await readSpreadsheetWorkbook(GENOME_SHEET_ID, userAccessToken);
-  } catch (e) {
-    const why = e instanceof Error ? e.message : "unknown error";
-    throw new Error(
-      `Core Library not loaded: could not read the Future2 Experience Genome workbook (${why}). Ensure the account has access to the Genome sheet, or bundle it in genome-data.ts.`
-    );
-  }
-  const indexed = indexWorkbook(sheets);
-  if (!indexed.trim()) {
-    throw new Error("Core Library not loaded: the Future2 Experience Genome workbook returned no readable content.");
-  }
-  genomeCache = indexed;
-  return indexed;
+  genomeCache = local;
+  return local;
 }
 
 export type CoreLibrary = {
@@ -76,13 +75,12 @@ export type CoreLibrary = {
 };
 
 /**
- * Load the permanent Future2 Core Library. Throws a clear error if a required
- * resource (Genome or template registry) is missing.
+ * Load the permanent Future2 Core Library. Optimized for reliability and speed:
+ * it never blocks generation — the local exported Genome is always available as
+ * the fallback, and the Dictionary / Authoring Guidelines / registries are
+ * bundled in code.
  */
 export async function loadCoreLibrary(userAccessToken?: string): Promise<CoreLibrary> {
-  if (!hasRegistryEntries()) {
-    throw new Error("Core Library not loaded: the lesson/slide template registry is empty.");
-  }
   const genome = await loadGenome(userAccessToken);
   return {
     genome,
