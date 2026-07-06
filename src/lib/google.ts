@@ -28,7 +28,7 @@ function serviceAuth() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
   if (!raw) {
     throw new Error(
-      "GOOGLE_SERVICE_ACCOUNT_KEY is not set. Add the service-account JSON key as an environment variable to enable Drive publishing/filling."
+      "Google template copying is not configured. Add GOOGLE_SERVICE_ACCOUNT_KEY to enable native template output."
     );
   }
   let credentials: Record<string, unknown>;
@@ -232,21 +232,41 @@ export async function readDriveFile(
   return { buffer: Buffer.from(res.data as ArrayBuffer), name };
 }
 
-/** Copy a template file into the output folder and return the copy's id. */
-async function copyTemplate(templateId: string, name: string): Promise<{ id: string; webViewLink: string }> {
+/**
+ * Copy a template file and return the copy's id. Copies into DRIVE_OUTPUT_FOLDER_ID
+ * when set, otherwise the service account's own Drive. When shareWithEmail is
+ * provided, the signed-in user is granted edit access so the returned link works
+ * for them regardless of folders (the copy is owned by the service account).
+ */
+async function copyTemplate(
+  templateId: string,
+  name: string,
+  shareWithEmail?: string
+): Promise<{ id: string; webViewLink: string }> {
   const folderId = process.env.DRIVE_OUTPUT_FOLDER_ID;
-  if (!folderId) {
-    throw new Error("DRIVE_OUTPUT_FOLDER_ID is not set. Set it to the ID of the Drive folder shared with the service account.");
-  }
   const drive = driveClient();
   const res = await drive.files.copy({
     fileId: templateId,
-    requestBody: { name, parents: [folderId] },
+    requestBody: { name, ...(folderId ? { parents: [folderId] } : {}) },
     supportsAllDrives: true,
     fields: "id, webViewLink",
   });
-  if (!res.data.id) throw new Error("Drive did not return an id for the copied template.");
-  return { id: res.data.id, webViewLink: res.data.webViewLink || `https://drive.google.com/file/d/${res.data.id}/view` };
+  const id = res.data.id;
+  if (!id) throw new Error("Drive did not return an id for the copied template.");
+
+  if (shareWithEmail) {
+    try {
+      await drive.permissions.create({
+        fileId: id,
+        requestBody: { role: "writer", type: "user", emailAddress: shareWithEmail },
+        sendNotificationEmail: false,
+        supportsAllDrives: true,
+      });
+    } catch {
+      // Non-fatal: the copy still exists; the user may reach it via a shared folder.
+    }
+  }
+  return { id, webViewLink: res.data.webViewLink || `https://drive.google.com/file/d/${id}/view` };
 }
 
 function replaceRequests(replacements: Record<string, string>) {
@@ -267,10 +287,11 @@ function replaceRequests(replacements: Record<string, string>) {
 export async function fillPresentationFromTemplate(
   templateId: string,
   replacements: Record<string, string>,
-  name: string
+  name: string,
+  shareWithEmail?: string
 ): Promise<{ id: string; webViewLink: string }> {
   const auth = serviceAuth();
-  const copy = await copyTemplate(templateId, name);
+  const copy = await copyTemplate(templateId, name, shareWithEmail);
   const slides = google.slides({ version: "v1", auth });
   await slides.presentations.batchUpdate({
     presentationId: copy.id,
@@ -286,10 +307,11 @@ export async function fillPresentationFromTemplate(
 export async function fillDocumentFromTemplate(
   templateId: string,
   replacements: Record<string, string>,
-  name: string
+  name: string,
+  shareWithEmail?: string
 ): Promise<{ id: string; webViewLink: string }> {
   const auth = serviceAuth();
-  const copy = await copyTemplate(templateId, name);
+  const copy = await copyTemplate(templateId, name, shareWithEmail);
   const docs = google.docs({ version: "v1", auth });
   await docs.documents.batchUpdate({
     documentId: copy.id,

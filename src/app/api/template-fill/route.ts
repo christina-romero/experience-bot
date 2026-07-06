@@ -146,12 +146,19 @@ export async function POST(req: Request) {
       fillError = `Template has duplicate placeholders (each must be unique): ${duplicates.map(toToken).join(", ")}`;
     } else {
       try {
-        const name = `${scope.competency}_${scope.gradeBand}_${plan.day}`.replace(/[/\\:*?"<>|]/g, "-");
+        // [Competency]_[Dyad]_Week [#]_Day [#]_[Design Model]
+        const wk = plan.day.match(/week\s*(\d+)/i)?.[1] ?? "";
+        const dayNum = plan.day.match(/day\s*(\d+)/i)?.[1] ?? "";
+        const name = `${scope.competency}_${scope.gradeBand}_Week ${wk}_Day ${dayNum}_${plan.lessonType}`.replace(
+          /[/\\:*?"<>|]/g,
+          "-"
+        );
+        const shareWith = session?.user?.email ?? undefined;
         const replacements = toReplacements(check.mapped);
         filled =
           wantKind === "slides"
-            ? await fillPresentationFromTemplate(templateId, replacements, name)
-            : await fillDocumentFromTemplate(templateId, replacements, name);
+            ? await fillPresentationFromTemplate(templateId, replacements, name, shareWith)
+            : await fillDocumentFromTemplate(templateId, replacements, name, shareWith);
       } catch (e) {
         fillError = e instanceof Error ? e.message : "Template render failed.";
       }

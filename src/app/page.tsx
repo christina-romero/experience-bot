@@ -174,33 +174,16 @@ export default function Page() {
       window.open(res.webViewLink, "_blank");
     }, `grfill-${plan.day}`);
 
-  // Run the Template Match Check and render into the Google template when that is
-  // configured. This NEVER leaves the user empty-handed: if native rendering is
-  // not configured or fails, it falls back to the reliable .docx export.
-  const fillTemplate = (plan: LessonPlan, week: LessonWeek) =>
+  // Copy the exact Google template (Doc or Slides) and fill its placeholders.
+  // No silent fallback to a non-template file: on failure the error is shown, and
+  // the clearly labeled "Download draft" buttons remain for a DOCX/PPTX draft.
+  const fillTemplate = (plan: LessonPlan, kind: "doc" | "slides") =>
     guard(async () => {
       if (!scope) return;
-      let res: TemplateFillResult;
-      try {
-        res = await post<TemplateFillResult>("/api/template-fill", { scope, plan, kind: "doc" });
-      } catch (e) {
-        const why = e instanceof Error ? e.message : "Template check unavailable";
-        res = {
-          placeholders: [],
-          object: {},
-          templateMatchCheck: { unmapped: [], missing: [], duplicates: [] },
-          facilitation: [],
-          file: null,
-          fillError: `${why} — downloaded .docx instead.`,
-        };
-      }
+      const res = await post<TemplateFillResult>("/api/template-fill", { scope, plan, kind });
       setTmpl((t) => ({ ...t, [plan.day]: res }));
-      if (res.file?.webViewLink) {
-        window.open(res.file.webViewLink, "_blank");
-      } else {
-        // Native render unavailable -> guaranteed artifact via the working export.
-        await exportLessonWeekDocx(scope, week);
-      }
+      if (res.file?.webViewLink) window.open(res.file.webViewLink, "_blank");
+      else if (res.fillError) setError(res.fillError);
     }, `tmpl-${plan.day}`);
 
   const allPlans: LessonPlan[] = useMemo(
@@ -399,7 +382,7 @@ export default function Page() {
                           Regenerate
                         </Button>
                         <Button variant="secondary" onClick={() => exportLessonWeekDocx(scope, generated)}>
-                          Download .docx
+                          Download draft (.docx)
                         </Button>
                         {driveEnabled && (
                           <Button
@@ -453,8 +436,8 @@ export default function Page() {
                                   </span>
                                 )}
                               </div>
-                              <Button variant="secondary" disabled={busy !== null} onClick={fillTemplate(plan, generated)}>
-                                {busy === `tmpl-${plan.day}` ? "Checking…" : "Match Check + fill"}
+                              <Button variant="secondary" disabled={busy !== null} onClick={fillTemplate(plan, "doc")}>
+                                {busy === `tmpl-${plan.day}` ? "Copying…" : "Copy Google Doc template"}
                               </Button>
                             </div>
                             {tmpl[plan.day] && <MatchCheck r={tmpl[plan.day]} />}
@@ -503,8 +486,11 @@ export default function Page() {
                         <Button variant="ghost" onClick={genDeck(plan)} disabled={busy !== null || deckApproved[plan.day]}>
                           Regenerate
                         </Button>
+                        <Button variant="secondary" disabled={busy !== null} onClick={fillTemplate(plan, "slides")}>
+                          {busy === `tmpl-${plan.day}` ? "Copying…" : "Copy Google Slides template"}
+                        </Button>
                         <Button variant="secondary" onClick={() => exportSlideDeckPptx(deck, scope)}>
-                          Download .pptx
+                          Download draft (.pptx)
                         </Button>
                         {driveEnabled && (
                           <Button
