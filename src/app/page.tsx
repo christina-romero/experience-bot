@@ -860,7 +860,9 @@ function MatchCheck({ r }: { r: TemplateFillResult }) {
         {c.duplicates.length} duplicate
       </div>
       {c.duplicates.length > 0 && (
-        <div className="text-red-600">Duplicates (make each unique): {c.duplicates.join(", ")}</div>
+        <div className="text-slate-500">
+          Repeated tokens (filled with the same value in each spot): {c.duplicates.join(", ")}
+        </div>
       )}
       {c.missing.length > 0 && <div className="text-amber-700">Missing: {c.missing.join(", ")}</div>}
       {c.unmapped.length > 0 && <div className="text-slate-500">Unmapped (ignored): {c.unmapped.join(", ")}</div>}
