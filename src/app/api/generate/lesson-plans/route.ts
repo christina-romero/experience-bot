@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { generateStructured } from "@/lib/anthropic";
 import { lessonWeekSchema, type LessonWeek, type ScopeSequence } from "@/lib/schemas";
 import { lessonWeekPrompt } from "@/lib/prompts";
-import { loadCoreLibrary } from "@/lib/core-library";
-import { auth } from "@/auth";
+import { retrieveGenomeForWeek } from "@/lib/genome-retrieval";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -15,11 +14,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "scope and week are required." }, { status: 400 });
     }
 
-    // Load the permanent Core Library first; fail clearly if it cannot be loaded.
-    const session = await auth();
-    const core = await loadCoreLibrary(session?.accessToken);
+    // Retrieval-first: inject only the most relevant Genome seeds + supporting
+    // instructional collections for this week, not the whole bundled workbook.
+    const genome = retrieveGenomeForWeek(scope, week);
 
-    const prompt = lessonWeekPrompt({ scope, week, genome: core.genome });
+    const prompt = lessonWeekPrompt({ scope, week, genome });
     const data = await generateStructured<LessonWeek>(prompt, lessonWeekSchema, { maxTokens: 32000 });
     return NextResponse.json(data);
   } catch (err: unknown) {
