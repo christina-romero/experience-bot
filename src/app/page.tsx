@@ -6,7 +6,7 @@ import { Button, Banner, Card, Spinner } from "@/components/ui";
 import { ScopeSequenceEditor } from "@/components/ScopeSequenceEditor";
 import { LessonWeekEditor } from "@/components/LessonWeekEditor";
 import { SlideDeckEditor } from "@/components/SlideDeckEditor";
-import type { ScopeSequence, LessonWeek, SlideDeck, LessonPlan } from "@/lib/schemas";
+import type { ScopeSequence, LessonWeek, SlideDeck, LessonPlan, CanonicalWeek, FidelityWeek } from "@/lib/schemas";
 import {
   exportScopeSequenceDocx,
   exportLessonWeekDocx,
@@ -77,6 +77,11 @@ export default function Page() {
   const [weeks, setWeeks] = useState<Record<number, LessonWeek>>({});
   const [weekApproved, setWeekApproved] = useState<Record<number, boolean>>({});
 
+  // Two Kings: the canonical Access spine + fidelity-gate result per week.
+  const [canonical, setCanonical] = useState<Record<number, CanonicalWeek>>({});
+  const [fidelity, setFidelity] = useState<Record<number, FidelityWeek>>({});
+  const [fidelityOverride, setFidelityOverride] = useState<Record<number, boolean>>({});
+
   const [decks, setDecks] = useState<Record<string, SlideDeck>>({});
   const [deckApproved, setDeckApproved] = useState<Record<string, boolean>>({});
 
@@ -141,6 +146,9 @@ export default function Page() {
       setScopeApproved(false);
       setWeeks({});
       setWeekApproved({});
+      setCanonical({});
+      setFidelity({});
+      setFidelityOverride({});
       setDecks({});
       setDeckApproved({});
     }
@@ -149,12 +157,26 @@ export default function Page() {
   const genWeek = (week: number) =>
     guard(async () => {
       if (!scope) return;
-      const data = await post<LessonWeek & { _debug?: WeekDebug }>("/api/generate/lesson-plans", { scope, week });
-      const { _debug, ...wk } = data;
+      const data = await post<
+        LessonWeek & { _debug?: WeekDebug; _canonical?: CanonicalWeek; _fidelity?: FidelityWeek }
+      >("/api/generate/lesson-plans", { scope, week });
+      const { _debug, _canonical, _fidelity, ...wk } = data;
       setWeeks((w) => ({ ...w, [week]: wk }));
       setWeekApproved((a) => ({ ...a, [week]: false }));
       if (_debug) setWeekDebug((d) => ({ ...d, [week]: _debug }));
+      if (_canonical) setCanonical((c) => ({ ...c, [week]: _canonical }));
+      if (_fidelity) setFidelity((f) => ({ ...f, [week]: _fidelity }));
+      setFidelityOverride((o) => ({ ...o, [week]: false }));
     }, `week-${week}`);
+
+  // Re-run the Two Kings fidelity gate on the (possibly edited) current week.
+  const recheckFidelity = (week: number) =>
+    guard(async () => {
+      if (!scope || !canonical[week] || !weeks[week]) return;
+      const f = await post<FidelityWeek>("/api/fidelity", { scope, canonical: canonical[week], week: weeks[week] });
+      setFidelity((prev) => ({ ...prev, [week]: f }));
+      setFidelityOverride((o) => ({ ...o, [week]: false }));
+    }, `fidelity-${week}`);
 
   const genDeck = (plan: LessonPlan) =>
     guard(async () => {
@@ -389,9 +411,19 @@ export default function Page() {
                         </Button>
                         <Button
                           variant={weekApproved[wk.week] ? "success" : "primary"}
+                          disabled={
+                            !weekApproved[wk.week] &&
+                            !!fidelity[wk.week] &&
+                            !fidelity[wk.week].weekPass &&
+                            !fidelityOverride[wk.week]
+                          }
                           onClick={() => setWeekApproved((a) => ({ ...a, [wk.week]: !a[wk.week] }))}
                         >
-                          {weekApproved[wk.week] ? "✓ Approved (Gate 2)" : "Approve Gate 2"}
+                          {weekApproved[wk.week]
+                            ? "✓ Approved (Gate 2)"
+                            : fidelity[wk.week] && !fidelity[wk.week].weekPass && !fidelityOverride[wk.week]
+                            ? "Fidelity gate failed"
+                            : "Approve Gate 2"}
                         </Button>
                       </>
                     )}
@@ -405,6 +437,16 @@ export default function Page() {
                       readOnly={weekApproved[wk.week]}
                       onChange={(w) => setWeeks((prev) => ({ ...prev, [wk.week]: w }))}
                     />
+                    {fidelity[wk.week] && (
+                      <FidelityPanel
+                        f={fidelity[wk.week]}
+                        rechecking={busy === `fidelity-${wk.week}`}
+                        onRecheck={recheckFidelity(wk.week)}
+                        override={!!fidelityOverride[wk.week]}
+                        onToggleOverride={() => setFidelityOverride((o) => ({ ...o, [wk.week]: !o[wk.week] }))}
+                      />
+                    )}
+                    {canonical[wk.week] && <CanonicalPanel c={canonical[wk.week]} />}
                     {tmpl[`week:${wk.week}`] && (
                       <div className="mt-4">
                         <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -480,6 +522,104 @@ export default function Page() {
         </div>
       )}
     </div>
+  );
+}
+
+// Two Kings: the fidelity-gate result for a week (the four protected fields per day).
+function FidelityPanel({
+  f,
+  onRecheck,
+  rechecking,
+  override,
+  onToggleOverride,
+}: {
+  f: FidelityWeek;
+  onRecheck: () => void;
+  rechecking: boolean;
+  override: boolean;
+  onToggleOverride: () => void;
+}) {
+  const fields = [
+    { key: "unlock", label: "Earned unlock" },
+    { key: "binaryMastery", label: "Binary mastery" },
+    { key: "mechanismWhy", label: "Mechanism Why" },
+    { key: "escalation", label: "Grade-band escalation" },
+  ] as const;
+  return (
+    <div className={`mt-3 rounded-md border p-3 text-xs ${f.weekPass ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"}`}>
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-semibold text-slate-700">
+          Two Kings fidelity gate{" "}
+          <span className={f.weekPass ? "text-green-700" : "text-red-700"}>{f.weekPass ? "PASS" : "FAIL"}</span>
+        </span>
+        <button
+          className="rounded border border-slate-300 bg-white px-2 py-0.5 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          onClick={onRecheck}
+          disabled={rechecking}
+        >
+          {rechecking ? "Checking…" : "Re-check fidelity"}
+        </button>
+      </div>
+      <div className="space-y-2">
+        {f.days.map((d) => (
+          <div key={d.day} className="border-t border-black/5 pt-1.5">
+            <div className="font-semibold text-slate-700">
+              {d.dayPass ? "✓" : "✗"} {d.day}
+            </div>
+            <ul className="mt-0.5 space-y-0.5">
+              {fields.map(({ key, label }) => {
+                const cell = d[key];
+                return (
+                  <li key={key} className={cell.pass ? "text-slate-500" : "text-red-700"}>
+                    {cell.pass ? "✓" : "✗"} {label}
+                    {!cell.pass && cell.note ? `: ${cell.note}` : ""}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+      {!f.weekPass && (
+        <label className="mt-2 flex items-center gap-2 text-slate-600">
+          <input type="checkbox" checked={override} onChange={onToggleOverride} />
+          Override the gate — I verified these fields manually and accept the risk.
+        </label>
+      )}
+    </div>
+  );
+}
+
+// Two Kings: the canonical Access spine (source of record), collapsed by default.
+function CanonicalPanel({ c }: { c: CanonicalWeek }) {
+  const rows: { label: string; get: (d: CanonicalWeek["days"][number]) => string }[] = [
+    { label: "Mechanism / Why", get: (d) => d.mechanismWhy },
+    { label: "Earned unlock", get: (d) => d.unlock },
+    { label: "Binary Check2Pass", get: (d) => d.binaryCheck2Pass },
+    { label: "Grade-band escalation", get: (d) => d.gradeBandEscalation },
+    { label: "Guide moves", get: (d) => d.guideMoves },
+  ];
+  return (
+    <details className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs">
+      <summary className="cursor-pointer font-semibold text-slate-600">
+        Canonical Access spine (source of record) — {c.days.length} day{c.days.length === 1 ? "" : "s"}
+      </summary>
+      <div className="mt-2 space-y-3">
+        {c.days.map((d) => (
+          <div key={d.day} className="border-t border-slate-200 pt-2">
+            <div className="font-semibold text-slate-700">{d.day}</div>
+            <div className="mt-1 space-y-1">
+              {rows.map((r) => (
+                <div key={r.label} className="grid grid-cols-[150px_1fr] gap-2">
+                  <span className="text-slate-500">{r.label}</span>
+                  <span className="text-slate-700">{r.get(d)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 

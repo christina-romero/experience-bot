@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { generateStructured } from "@/lib/anthropic";
-import { lessonWeekSchema, type LessonWeek, type ScopeSequence } from "@/lib/schemas";
-import { lessonWeekPrompt } from "@/lib/prompts";
+import {
+  lessonWeekSchema,
+  canonicalWeekSchema,
+  fidelityWeekSchema,
+  type LessonWeek,
+  type CanonicalWeek,
+  type FidelityWeek,
+  type ScopeSequence,
+} from "@/lib/schemas";
+import { lessonWeekPrompt, canonicalWeekPrompt, fidelityGatePrompt } from "@/lib/prompts";
 import { retrieveGenomeForWeek, retrieveGenomeDebug } from "@/lib/genome-retrieval";
 import { resolveTemplateId } from "@/lib/template-registry";
 
@@ -26,8 +34,25 @@ export async function POST(req: Request) {
     // instructional collections for this week, not the whole bundled workbook.
     const genome = retrieveGenomeForWeek(scope, week);
 
-    const prompt = lessonWeekPrompt({ scope, week, genome });
-    const data = await generateStructured<LessonWeek>(prompt, lessonWeekSchema, { maxTokens: 32000 });
+    // TWO KINGS pipeline: (A) write the canonical Access spine, (B) render the
+    // HISD derivative FROM it, (C) run the fidelity gate as an adversarial diff.
+    const canonical = await generateStructured<CanonicalWeek>(
+      canonicalWeekPrompt({ scope, week, genome }),
+      canonicalWeekSchema,
+      { maxTokens: 16000 }
+    );
+
+    const data = await generateStructured<LessonWeek>(
+      lessonWeekPrompt({ scope, week, genome, canonical }),
+      lessonWeekSchema,
+      { maxTokens: 32000 }
+    );
+
+    const fidelity = await generateStructured<FidelityWeek>(
+      fidelityGatePrompt({ scope, canonical, week: data }),
+      fidelityWeekSchema,
+      { maxTokens: 12000 }
+    );
 
     // Developer-only debug payload (surfaced in the app behind the ?debug=1 toggle).
     const debug = {
@@ -45,7 +70,7 @@ export async function POST(req: Request) {
       })),
     };
 
-    return NextResponse.json({ ...data, _debug: debug });
+    return NextResponse.json({ ...data, _canonical: canonical, _fidelity: fidelity, _debug: debug });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Generation failed.";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -90,6 +90,39 @@ export interface LessonWeek {
   plans: LessonPlan[];
 }
 
+// ---- Two Kings: the canonical Access-Model spine (Stage A, source of record) ----
+export interface CanonicalDay {
+  day: string; // "Week 1, Day 1"
+  mechanismWhy: string; // the capability being built + the mechanism that builds it
+  unlock: string; // what students EARN by demonstrating readiness (autonomy/harder challenge)
+  binaryCheck2Pass: string; // pass/fail success condition against an external bar
+  gradeBandEscalation: string; // how this is harder for the dyad than the band below
+  guideMoves: string; // facilitate/coach/question/observe/hold-the-line (no lecture/rescue)
+}
+export interface CanonicalWeek {
+  week: number;
+  days: CanonicalDay[];
+}
+
+// ---- Two Kings: the fidelity gate (Stage C, derivative-vs-canonical diff) ----
+export interface FidelityField {
+  pass: boolean;
+  note: string; // one concrete sentence: what holds, or exactly what was softened/dropped
+}
+export interface FidelityDay {
+  day: string;
+  unlock: FidelityField; // earned progression still explicit + tied to demonstrated capability
+  binaryMastery: FidelityField; // still pass/fail vs external bar, not vague completion language
+  mechanismWhy: FidelityField; // still names how the activity builds the skill, not rubric-evidence
+  escalation: FidelityField; // grade-band escalation still present
+  dayPass: boolean; // true only when all four protected fields pass
+}
+export interface FidelityWeek {
+  week: number;
+  days: FidelityDay[];
+  weekPass: boolean; // true only when every day passes
+}
+
 export interface Slide {
   n: number;
   kind: string; // "title" | "materials" | "divider" | "content" | "reflection" | "closure" | "attribution"
@@ -234,6 +267,64 @@ export const lessonWeekSchema = {
     plans: { type: "array", items: lessonPlanSchema },
   },
   required: ["week", "plans"],
+} as const;
+
+// ---- Two Kings canonical spine (Stage A) ----
+const canonicalDaySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    day: str,
+    mechanismWhy: str,
+    unlock: str,
+    binaryCheck2Pass: str,
+    gradeBandEscalation: str,
+    guideMoves: str,
+  },
+  required: ["day", "mechanismWhy", "unlock", "binaryCheck2Pass", "gradeBandEscalation", "guideMoves"],
+} as const;
+
+export const canonicalWeekSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    week: { type: "integer" },
+    days: { type: "array", items: canonicalDaySchema },
+  },
+  required: ["week", "days"],
+} as const;
+
+// ---- Two Kings fidelity gate (Stage C) ----
+const fidelityFieldSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: { pass: { type: "boolean" }, note: str },
+  required: ["pass", "note"],
+} as const;
+
+const fidelityDaySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    day: str,
+    unlock: fidelityFieldSchema,
+    binaryMastery: fidelityFieldSchema,
+    mechanismWhy: fidelityFieldSchema,
+    escalation: fidelityFieldSchema,
+    dayPass: { type: "boolean" },
+  },
+  required: ["day", "unlock", "binaryMastery", "mechanismWhy", "escalation", "dayPass"],
+} as const;
+
+export const fidelityWeekSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    week: { type: "integer" },
+    days: { type: "array", items: fidelityDaySchema },
+    weekPass: { type: "boolean" },
+  },
+  required: ["week", "days", "weekPass"],
 } as const;
 
 // ---- Gradual Release & Discussion deck: values for the tokenized template ----
