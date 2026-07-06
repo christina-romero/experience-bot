@@ -39,7 +39,23 @@ function dyadToBand(dyad: string): string {
   return "";
 }
 
-// Design Model has no column in the Genome; map it to preferred Experience Phases.
+/**
+ * TODO (Genome schema — future first-class retrieval fields):
+ * Add two metadata columns to the Future2 Experience Genome workbook. Once
+ * populated, they REPLACE the heuristics below (kept only as fallbacks):
+ *   1. "Primary Competency Behavior" — the single observable behavior each seed
+ *      best trains (e.g. "resolves disagreement"). Retrieval will match it EXACTLY
+ *      to the day's determined behavior instead of synonym-matching the task text.
+ *   2. "Preferred Design Model" — the Design Model each seed fits ("Gradual Release
+ *      and Discussion" / "Skills Lab" / "Simulation and Synthesis" / "CPC").
+ *      Retrieval will match it EXACTLY instead of mapping Design Model -> phase.
+ * The code below already reads these columns when present; until then it uses the
+ * semantic behavior matching and the Design-Model -> Experience-Phase mapping.
+ */
+const COL_PRIMARY_BEHAVIOR = "Primary Competency Behavior";
+const COL_PREFERRED_DESIGN_MODEL = "Preferred Design Model";
+
+// Design Model has no column in the Genome yet; map it to preferred Experience Phases.
 const DESIGN_MODEL_PHASES: Record<string, string[]> = {
   gradual_release: ["Launch", "Skill Build"],
   skills_lab: ["Skill Build", "Iteration"],
@@ -166,6 +182,10 @@ function expandBehavior(b: string): string[] {
  */
 function behaviorScore(row: Row, behaviors: string[]): number {
   if (!behaviors.length) return 0;
+  // First-class: exact match on the seed's tagged Primary Competency Behavior.
+  const tagged = norm(cell(row, COL_PRIMARY_BEHAVIOR));
+  if (tagged) return behaviors.some((b) => norm(b) === tagged) ? 80 : 0;
+  // Fallback (until the column is populated): semantic match on the task text.
   const hay = norm(
     `${cell(row, "Students Will Statement")} ${cell(row, "Competency Mechanism")} ${cell(row, "Rules")} ` +
       `${cell(row, "Round 1")} ${cell(row, "Round 2")} ${cell(row, "Round 3")} ${cell(row, "Success Criteria")} ` +
@@ -204,9 +224,15 @@ function scoreSeed(row: Row, q: Query): number {
   if (cell(row, "Grade Band") !== q.band) return -1;
   score += 80;
 
-  // 4 Design Model (via Experience Phase)
-  const phase = cell(row, "Experience Phase");
-  if ((DESIGN_MODEL_PHASES[q.designKey] ?? []).includes(phase)) score += 40;
+  // 4 Design Model — first-class exact match on the tagged column when present,
+  // otherwise fall back to the Design-Model -> Experience-Phase mapping.
+  const taggedDM = cell(row, COL_PREFERRED_DESIGN_MODEL);
+  if (taggedDM) {
+    if (canonicalLessonType(taggedDM) === q.designKey) score += 40;
+  } else {
+    const phase = cell(row, "Experience Phase");
+    if ((DESIGN_MODEL_PHASES[q.designKey] ?? []).includes(phase)) score += 40;
+  }
 
   // 4 Rubric Indicator
   if (q.rubricIndicator) {
