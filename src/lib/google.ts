@@ -238,11 +238,13 @@ export async function readDriveFile(
  * provided, the signed-in user is granted edit access so the returned link works
  * for them regardless of folders (the copy is owned by the service account).
  */
+export type ShareStatus = "ok" | "failed" | "skipped";
+
 async function copyTemplate(
   templateId: string,
   name: string,
   shareWithEmail?: string
-): Promise<{ id: string; webViewLink: string }> {
+): Promise<{ id: string; webViewLink: string; shared: ShareStatus }> {
   const folderId = process.env.DRIVE_OUTPUT_FOLDER_ID;
   const drive = driveClient();
   const res = await drive.files.copy({
@@ -254,6 +256,7 @@ async function copyTemplate(
   const id = res.data.id;
   if (!id) throw new Error("Drive did not return an id for the copied template.");
 
+  let shared: ShareStatus = "skipped";
   if (shareWithEmail) {
     try {
       await drive.permissions.create({
@@ -262,11 +265,12 @@ async function copyTemplate(
         sendNotificationEmail: false,
         supportsAllDrives: true,
       });
+      shared = "ok";
     } catch {
-      // Non-fatal: the copy still exists; the user may reach it via a shared folder.
+      shared = "failed"; // reported to the user; never silently swallowed
     }
   }
-  return { id, webViewLink: res.data.webViewLink || `https://drive.google.com/file/d/${id}/view` };
+  return { id, webViewLink: res.data.webViewLink || `https://drive.google.com/file/d/${id}/view`, shared };
 }
 
 function replaceRequests(replacements: Record<string, string>) {
@@ -289,7 +293,7 @@ export async function fillPresentationFromTemplate(
   replacements: Record<string, string>,
   name: string,
   shareWithEmail?: string
-): Promise<{ id: string; webViewLink: string }> {
+): Promise<{ id: string; webViewLink: string; shared: ShareStatus }> {
   const auth = serviceAuth();
   const copy = await copyTemplate(templateId, name, shareWithEmail);
   const slides = google.slides({ version: "v1", auth });
@@ -297,7 +301,7 @@ export async function fillPresentationFromTemplate(
     presentationId: copy.id,
     requestBody: { requests: replaceRequests(replacements) },
   });
-  return { id: copy.id, webViewLink: `https://docs.google.com/presentation/d/${copy.id}/edit` };
+  return { id: copy.id, webViewLink: `https://docs.google.com/presentation/d/${copy.id}/edit`, shared: copy.shared };
 }
 
 /**
@@ -309,7 +313,7 @@ export async function fillDocumentFromTemplate(
   replacements: Record<string, string>,
   name: string,
   shareWithEmail?: string
-): Promise<{ id: string; webViewLink: string }> {
+): Promise<{ id: string; webViewLink: string; shared: ShareStatus }> {
   const auth = serviceAuth();
   const copy = await copyTemplate(templateId, name, shareWithEmail);
   const docs = google.docs({ version: "v1", auth });
@@ -317,5 +321,5 @@ export async function fillDocumentFromTemplate(
     documentId: copy.id,
     requestBody: { requests: replaceRequests(replacements) },
   });
-  return { id: copy.id, webViewLink: `https://docs.google.com/document/d/${copy.id}/edit` };
+  return { id: copy.id, webViewLink: `https://docs.google.com/document/d/${copy.id}/edit`, shared: copy.shared };
 }

@@ -140,7 +140,7 @@ export async function POST(req: Request) {
     // ---- Render into a copied template (best-effort; validation stands either way) ----
     // Every placeholder must be unique with exactly one destination; refuse to
     // render an ambiguous template until the author makes duplicates unique.
-    let filled: { id: string; webViewLink: string } | null = null;
+    let filled: { id: string; webViewLink: string; shared: "ok" | "failed" | "skipped" } | null = null;
     let fillError: string | undefined;
     if (duplicates.length) {
       fillError = `Template has duplicate placeholders (each must be unique): ${duplicates.map(toToken).join(", ")}`;

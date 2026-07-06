@@ -181,9 +181,8 @@ export default function Page() {
     guard(async () => {
       if (!scope) return;
       const res = await post<TemplateFillResult>("/api/template-fill", { scope, plan, kind });
-      setTmpl((t) => ({ ...t, [plan.day]: res }));
-      if (res.file?.webViewLink) window.open(res.file.webViewLink, "_blank");
-      else if (res.fillError) setError(res.fillError);
+      setTmpl((t) => ({ ...t, [`${plan.day}:${kind}`]: { ...res, kind } }));
+      if (!res.file?.webViewLink && res.fillError) setError(res.fillError);
     }, `tmpl-${plan.day}`);
 
   const allPlans: LessonPlan[] = useMemo(
@@ -440,7 +439,7 @@ export default function Page() {
                                 {busy === `tmpl-${plan.day}` ? "Copying…" : "Copy Google Doc template"}
                               </Button>
                             </div>
-                            {tmpl[plan.day] && <MatchCheck r={tmpl[plan.day]} />}
+                            {tmpl[`${plan.day}:doc`] && <MatchCheck r={tmpl[`${plan.day}:doc`]} />}
                           </div>
                         );
                       })}
@@ -519,6 +518,7 @@ export default function Page() {
                   </div>
                 </div>
                 {busy === `deck-${plan.day}` && <Spinner label="Building the student-facing deck…" />}
+                {tmpl[`${plan.day}:slides`] && <MatchCheck r={tmpl[`${plan.day}:slides`]} />}
                 {deck && (
                   <SlideDeckEditor
                     deck={deck}
@@ -880,8 +880,9 @@ type TemplateFillResult = {
   object: Record<string, string>;
   templateMatchCheck: { unmapped: string[]; missing: string[]; duplicates: string[] };
   facilitation: { field: string; verdict: string; reasons: string }[];
-  file: { id: string; webViewLink: string } | null;
+  file: { id: string; webViewLink: string; shared?: "ok" | "failed" | "skipped" } | null;
   fillError?: string;
+  kind?: "doc" | "slides";
 };
 
 // Template Match Check panel: what mapped, what is missing / unmapped / duplicated,
@@ -892,9 +893,18 @@ function MatchCheck({ r }: { r: TemplateFillResult }) {
   return (
     <div className="mt-3 space-y-1 border-t border-slate-100 pt-2 text-xs">
       {r.file?.webViewLink && (
-        <a href={r.file.webViewLink} target="_blank" rel="noreferrer" className="text-brand-light underline">
-          Open filled template ↗
-        </a>
+        <div className="rounded-md border border-green-300 bg-green-50 px-2 py-1.5 text-green-800">
+          <div className="font-semibold">✓ {r.kind === "slides" ? "Slide Deck" : "Lesson Plan"} created</div>
+          <a href={r.file.webViewLink} target="_blank" rel="noreferrer" className="text-brand-light underline">
+            Open Google {r.kind === "slides" ? "Slides" : "Doc"} ↗
+          </a>
+          {r.file.shared === "ok" && <div className="mt-0.5">Shared with your Google account.</div>}
+          {r.file.shared === "failed" && (
+            <div className="mt-0.5 text-amber-700">
+              The files were created successfully but could not be shared automatically. Contact an administrator.
+            </div>
+          )}
+        </div>
       )}
       {r.fillError && <div className="text-amber-700">Not rendered: {r.fillError}</div>}
       <div className="text-slate-600">
