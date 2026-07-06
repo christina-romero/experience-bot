@@ -192,17 +192,16 @@ export default function Page() {
     () =>
       Object.keys(weeks)
         .map(Number)
-        .filter((n) => weekApproved[n])
         .sort((a, b) => a - b)
         .flatMap((n) => weeks[n].plans),
-    [weeks, weekApproved]
+    [weeks]
   );
 
   const steps: { key: Stage; label: string; enabled: boolean }[] = [
     { key: "config", label: "1. Inputs", enabled: true },
     { key: "scope", label: "2. Review S&S", enabled: !!scope },
     { key: "plans", label: "3. Lesson Plans", enabled: scopeApproved },
-    { key: "decks", label: "4. Slide Decks", enabled: Object.values(weekApproved).some(Boolean) },
+    { key: "decks", label: "4. Slide Decks", enabled: Object.keys(weeks).length > 0 },
   ];
 
   return (
@@ -358,7 +357,6 @@ export default function Page() {
         <div className="space-y-5">
           {!scopeApproved && <Banner tone="info">Approve Gate 1 first to lock the Scope & Sequence.</Banner>}
           {scope.weeks.map((wk) => {
-            const prevApproved = wk.week === 1 || weekApproved[wk.week - 1];
             const generated = weeks[wk.week];
             // Strip a redundant leading "Week N" from the parsed title so it isn't repeated.
             const weekTitle = wk.title.replace(/^\s*week\s*\d+\s*[:\-–—]?\s*/i, "").trim();
@@ -373,10 +371,10 @@ export default function Page() {
                     {!generated ? (
                       <Button
                         onClick={genWeek(wk.week)}
-                        disabled={!prevApproved || busy !== null}
+                        disabled={busy !== null}
                         variant="primary"
                       >
-                        {busy === `week-${wk.week}` ? "Generating…" : prevApproved ? `Generate Week ${wk.week} plans` : "Locked (approve prior week)"}
+                        {busy === `week-${wk.week}` ? "Generating…" : `Generate Week ${wk.week} plans`}
                       </Button>
                     ) : (
                       <>
@@ -427,7 +425,7 @@ export default function Page() {
       {/* STAGE 4: SLIDE DECKS */}
       {stage === "decks" && scope && (
         <div className="space-y-4">
-          {allPlans.length === 0 && <Banner tone="info">Approve at least one week of lesson plans (Gate 2) to unlock its slide decks.</Banner>}
+          {allPlans.length === 0 && <Banner tone="info">Generate at least one week of lesson plans to unlock its slide decks.</Banner>}
           {allPlans.map((plan) => {
             const deck = decks[plan.day];
             return (
