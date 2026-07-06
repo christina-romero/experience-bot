@@ -117,17 +117,16 @@ export async function POST(req: Request) {
 
     const check = templateMatchCheck(placeholders, generated);
 
+    // In a weekly doc some tokens intentionally repeat with ONE value (e.g.
+    // {{COMPETENCY}}, {{WEEK_NUMBER}}, {{DYAD}}). replaceAllText fills every
+    // occurrence with the same value, so repeats are fine here — do not block.
     let filled: { id: string; webViewLink: string; shared: "ok" | "failed" | "skipped" } | null = null;
     let fillError: string | undefined;
-    if (duplicates.length) {
-      fillError = `Template has duplicate placeholders (each must be unique): ${duplicates.map(toToken).join(", ")}`;
-    } else {
-      try {
-        const name = `${scope.competency}_${scope.gradeBand}_Week ${week}_${designModel}`.replace(/[/\\:*?"<>|]/g, "-");
-        filled = await fillDocumentFromTemplate(templateId, toReplacements(check.mapped), name, session?.user?.email ?? undefined);
-      } catch (e) {
-        fillError = e instanceof Error ? e.message : "Template render failed.";
-      }
+    try {
+      const name = `${scope.competency}_${scope.gradeBand}_Week ${week}_${designModel}`.replace(/[/\\:*?"<>|]/g, "-");
+      filled = await fillDocumentFromTemplate(templateId, toReplacements(check.mapped), name, session?.user?.email ?? undefined);
+    } catch (e) {
+      fillError = e instanceof Error ? e.message : "Template render failed.";
     }
 
     return NextResponse.json({
