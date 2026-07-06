@@ -22,6 +22,29 @@ export async function GET() {
     }
   }
 
+  // Recovery: strip anything before the first { and after the last } (e.g. a
+  // stray leading "a"), then re-validate. If it parses, `repaired` is a clean
+  // one-line value you can paste back into Vercel.
+  let repaired: string | null = null;
+  let repairedValid = false;
+  let repairedKeys: string[] | null = null;
+  if (raw) {
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    if (start !== -1 && end !== -1 && end > start) {
+      const slice = raw.slice(start, end + 1);
+      try {
+        const obj = JSON.parse(slice) as Record<string, unknown>;
+        repaired = JSON.stringify(obj); // minified, canonical
+        repairedKeys = Object.keys(obj);
+        repairedValid = true;
+      } catch {
+        repaired = slice; // still broken; shown so you can eyeball it
+        repairedValid = false;
+      }
+    }
+  }
+
   const models = [
     "Gradual Release and Discussion",
     "Simulation and Synthesis",
@@ -40,6 +63,9 @@ export async function GET() {
     parseError, // non-null => malformed JSON, app is using DEFAULT (untokenized) IDs
     parsedKeys, // must be exactly: gradual_release, simulation_synthesis, skills_lab, cpc
     expectedKeys: ["gradual_release", "simulation_synthesis", "skills_lab", "cpc"],
+    repairedValid, // true => `repaired` is a clean value you can paste back into Vercel
+    repairedKeys,
+    repaired, // <-- copy THIS into a fresh TEMPLATE_REGISTRY_JSON, then redeploy
     resolved, // the ACTUAL IDs the app will copy for each model
   });
 }
