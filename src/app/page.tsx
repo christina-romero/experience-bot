@@ -185,6 +185,19 @@ export default function Page() {
       if (!res.file?.webViewLink && res.fillError) setError(res.fillError);
     }, `tmpl-${plan.day}`);
 
+  // One Google Doc per week: fill the whole week's plans into a single copied template.
+  const fillWeekTemplate = (week: LessonWeek) =>
+    guard(async () => {
+      if (!scope) return;
+      const res = await post<TemplateFillResult>("/api/template-fill-week", {
+        scope,
+        week: week.week,
+        weekPlans: week.plans,
+      });
+      setTmpl((t) => ({ ...t, [`week:${week.week}`]: { ...res, kind: "doc" } }));
+      if (!res.file?.webViewLink && res.fillError) setError(res.fillError);
+    }, `tmpl-week-${week.week}`);
+
   const allPlans: LessonPlan[] = useMemo(
     () =>
       Object.keys(weeks)
@@ -380,6 +393,9 @@ export default function Page() {
                         <Button variant="ghost" onClick={genWeek(wk.week)} disabled={busy !== null || weekApproved[wk.week]}>
                           Regenerate
                         </Button>
+                        <Button variant="secondary" disabled={busy !== null} onClick={fillWeekTemplate(generated)}>
+                          {busy === `tmpl-week-${wk.week}` ? "Copying…" : "Copy Google Doc (week)"}
+                        </Button>
                         <Button variant="secondary" onClick={() => exportLessonWeekDocx(scope, generated)}>
                           Download draft (.docx)
                         </Button>
@@ -417,33 +433,14 @@ export default function Page() {
                       readOnly={weekApproved[wk.week]}
                       onChange={(w) => setWeeks((prev) => ({ ...prev, [wk.week]: w }))}
                     />
-                    <div className="mt-4 space-y-2">
-                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Template Match Check
-                      </h4>
-                      {generated.plans.map((plan) => {
-                        const beta = !/gradual\s*release/i.test(plan.lessonType);
-                        return (
-                          <div key={plan.day} className="rounded-md border border-slate-200 p-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="text-sm">
-                                <span className="font-medium">{plan.day}</span>
-                                <span className="text-slate-400"> — {plan.lessonType}</span>
-                                {beta && (
-                                  <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                                    Beta
-                                  </span>
-                                )}
-                              </div>
-                              <Button variant="secondary" disabled={busy !== null} onClick={fillTemplate(plan, "doc")}>
-                                {busy === `tmpl-${plan.day}` ? "Copying…" : "Copy Google Doc template"}
-                              </Button>
-                            </div>
-                            {tmpl[`${plan.day}:doc`] && <MatchCheck r={tmpl[`${plan.day}:doc`]} />}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    {tmpl[`week:${wk.week}`] && (
+                      <div className="mt-4">
+                        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Weekly lesson-plan document
+                        </h4>
+                        <MatchCheck r={tmpl[`week:${wk.week}`]} />
+                      </div>
+                    )}
                     {debugOn && weekDebug[wk.week] && <DebugPanel d={weekDebug[wk.week]} />}
                   </>
                 )}
