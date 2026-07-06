@@ -63,13 +63,39 @@ function driveClient() {
  * read as that user (their own Drive, no sharing needed); otherwise fall back to
  * the service account (files shared with it).
  */
+function userOAuth(userAccessToken: string) {
+  const oauth = new google.auth.OAuth2();
+  oauth.setCredentials({ access_token: userAccessToken });
+  return oauth;
+}
+
 function driveReadClient(userAccessToken?: string) {
-  if (userAccessToken) {
-    const oauth = new google.auth.OAuth2();
-    oauth.setCredentials({ access_token: userAccessToken });
-    return google.drive({ version: "v3", auth: oauth });
-  }
+  if (userAccessToken) return google.drive({ version: "v3", auth: userOAuth(userAccessToken) });
   return driveClient();
+}
+
+/**
+ * Read EVERY worksheet of a Google Sheets workbook. Returns one entry per sheet,
+ * preserving the sheet name and its rows (header row first). Reads as the signed-in
+ * user when a token is provided, otherwise via the service account.
+ */
+export async function readSpreadsheetWorkbook(
+  spreadsheetId: string,
+  userAccessToken?: string
+): Promise<{ sheetName: string; rows: string[][] }[]> {
+  const auth = userAccessToken ? userOAuth(userAccessToken) : serviceAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties.title" });
+  const titles = (meta.data.sheets ?? [])
+    .map((s) => s.properties?.title)
+    .filter((t): t is string => !!t);
+  if (titles.length === 0) return [];
+  const batch = await sheets.spreadsheets.values.batchGet({ spreadsheetId, ranges: titles });
+  const valueRanges = batch.data.valueRanges ?? [];
+  return titles.map((title, i) => ({
+    sheetName: title,
+    rows: (valueRanges[i]?.values ?? []).map((row) => row.map((cell) => (cell == null ? "" : String(cell)))),
+  }));
 }
 
 export async function publishToDrive(opts: {

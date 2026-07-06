@@ -44,6 +44,11 @@ function loadRegistry(): Record<string, Entry> {
   }
 }
 
+/** True when at least one lesson type resolves to a template ID (Core Library check). */
+export function hasRegistryEntries(): boolean {
+  return Object.values(loadRegistry()).some((e) => !!(e.doc || e.slides));
+}
+
 /**
  * Normalize a messy lesson-type label to one canonical registry key. Keys match
  * the registered templates: gradual_release, skills_lab, simulation_synthesis, cpc.

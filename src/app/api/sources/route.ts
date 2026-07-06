@@ -21,16 +21,16 @@ type Category =
   | "scope_sequence"
   | "cpc"
   | "rubric"
-  | "genome"
   | "facilitation_library"
+  | "previous_lessons"
   | "notes"
   | "unknown";
 const CATEGORIES: Category[] = [
   "scope_sequence",
   "cpc",
   "rubric",
-  "genome",
   "facilitation_library",
+  "previous_lessons",
   "notes",
   "unknown",
 ];
@@ -101,8 +101,8 @@ function classifyPrompt(items: { index: number; name: string; snippet: string }[
     `- scope_sequence: a Scope & Sequence — the week-by-week or day-by-day plan / arc.`,
     `- cpc: a Culminating Performance Challenge (CPC) problem statement or structure.`,
     `- rubric: a competency rubric with indicators and levels.`,
-    `- genome: Future2 Experience Genome references or experiential-design patterns.`,
     `- facilitation_library: a library or list of facilitation moves, protocols, routines, or engagement strategies.`,
+    `- previous_lessons: prior lesson plans, decks, or day-by-day plans from an earlier version of this Experience.`,
     `- notes: supporting notes or anything else useful but not the above.`,
     `- unknown: cannot tell from the content.`,
     ``,
@@ -151,7 +151,7 @@ export async function POST(req: Request) {
 
     // 3. Assemble the internal source pack.
     const byCat: Record<Category, string[]> = {
-      scope_sequence: [], cpc: [], rubric: [], genome: [], facilitation_library: [], notes: [], unknown: [],
+      scope_sequence: [], cpc: [], rubric: [], facilitation_library: [], previous_lessons: [], notes: [], unknown: [],
     };
     const perSource = extracted.map((e) => {
       const category = catByIndex.get(e.index) ?? "unknown";
@@ -167,8 +167,8 @@ export async function POST(req: Request) {
       scopeSequence: !!ssText.trim(),
       cpc: !!cpcText.trim(),
       rubric: !!rubricText.trim(),
-      genome: byCat.genome.length > 0,
       facilitationLibrary: byCat.facilitation_library.length > 0,
+      previousLessons: byCat.previous_lessons.length > 0,
       notes: byCat.notes.length > 0,
     };
 
@@ -184,7 +184,6 @@ export async function POST(req: Request) {
       scope.rubricText = rubricText;
       scope.cpcText = cpcText;
       scope.facilitationText = join(byCat.facilitation_library);
-      scope.genomeText = join(byCat.genome);
     } else {
       missing.push("Scope & Sequence");
     }

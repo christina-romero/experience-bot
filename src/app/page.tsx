@@ -257,9 +257,10 @@ export default function Page() {
         <Card className="p-5">
           <h2 className="mb-1 text-lg font-semibold">Step 1 — Experience Sources</h2>
           <p className="mb-4 text-sm text-slate-600">
-            Choose the competency and dyad, then drop in everything you have — Scope &amp; Sequence, CPC, rubric, Future2
-            Genome references, and notes — as Google Doc links, files, or pasted text, in any mix. The app sorts each
-            source for you, shows what it found, and asks only for what is missing.
+            Choose the competency and dyad, then drop in the Experience-specific documents — Scope &amp; Sequence, CPC,
+            rubric, previous lessons, and notes — as Google Doc/Sheet/folder links, files, or pasted text, in any mix.
+            The Future2 Genome and templates are built in, so you never upload those. The app sorts each source, shows
+            what it found, and asks only for what is missing.
           </p>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
@@ -648,8 +649,8 @@ type SourceReport = {
     scopeSequence: boolean;
     cpc: boolean;
     rubric: boolean;
-    genome: boolean;
     facilitationLibrary: boolean;
+    previousLessons: boolean;
     notes: boolean;
   };
   missing: string[];
@@ -659,8 +660,8 @@ const CATEGORY_LABEL: Record<string, string> = {
   scope_sequence: "Scope & Sequence",
   cpc: "CPC",
   rubric: "Rubric",
-  genome: "Future2 Experience Genome",
   facilitation_library: "Facilitation Library",
+  previous_lessons: "Previous Lessons",
   notes: "Supporting Notes",
   unknown: "Unknown",
 };
@@ -669,8 +670,8 @@ const FOUND_LABEL: [keyof SourceReport["found"], string][] = [
   ["scopeSequence", "Scope & Sequence"],
   ["cpc", "CPC"],
   ["rubric", "Rubric"],
-  ["genome", "Genome"],
   ["facilitationLibrary", "Facilitation Library"],
+  ["previousLessons", "Previous Lessons"],
   ["notes", "Supporting Notes"],
 ];
 
