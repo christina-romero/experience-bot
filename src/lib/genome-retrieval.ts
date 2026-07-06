@@ -49,6 +49,7 @@ const DESIGN_MODEL_PHASES: Record<string, string[]> = {
 
 type Query = {
   competency: string;
+  behaviors: string[]; // today's primary competency behavior(s) — the action students must demonstrate
   band: string;
   designKey: string;
   rubricIndicator?: string;
@@ -59,6 +60,128 @@ type Query = {
 function keywordHits(hay: string, needle: string, minLen = 4): number {
   const words = norm(needle).split(" ").filter((w) => w.length > minLen);
   return words.filter((w) => hay.includes(w)).length;
+}
+
+/** The observable competency behaviors for a competency (Competency Behaviors sheet). */
+function competencyBehaviorList(competency: string): string[] {
+  const s = sheet("Competency Behaviors");
+  if (!s) return [];
+  const qc = norm(competency);
+  return s.rows
+    .filter((r) => norm(cell(r, "Competency")) === qc)
+    .map((r) => cell(r, "Observable Behavior"))
+    .filter(Boolean);
+}
+
+/** Determine today's primary competency behavior(s) from the day's text. */
+function pickDayBehaviors(all: string[], dayText: string): string[] {
+  const t = norm(dayText);
+  const scored = all
+    .map((b) => ({ b, s: (t.includes(norm(b)) ? 100 : 0) + keywordHits(t, b, 3) * 10 }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s);
+  return scored.length ? scored.slice(0, 2).map((x) => x.b) : all;
+}
+
+// Behavior word -> activity-vocabulary synonyms/stems. Seeds all share the same
+// generic Observable Behaviors list, so we match a behavior's ACTION words (and
+// their synonyms) against each seed's actual task text to rank by demonstration.
+const BEHAVIOR_SYNONYMS: Record<string, string[]> = {
+  resolves: ["resolve", "settle", "agree", "consensus", "compromise", "negoti"],
+  disagreement: ["disagree", "conflict", "argue", "dispute", "negoti", "trade", "fair", "consensus", "compromise"],
+  disagreements: ["disagree", "conflict", "negoti", "trade", "fair", "consensus", "compromise"],
+  shares: ["share", "split", "divide", "distribut", "fair"],
+  roles: ["role", "assign", "captain", "recorder", "job", "position"],
+  coordinates: ["coordinat", "sync", "synchron", "turn", "order", "sequence", "pace", "timing", "time"],
+  timing: ["time", "sync", "synchron", "pace", "turn", "order", "sequence"],
+  invites: ["invite", "input", "idea", "suggest", "propose", "everyone", "voice", "contribut"],
+  input: ["input", "idea", "suggest", "propose", "voice", "contribut"],
+  supports: ["support", "help", "assist", "encourag"],
+  teammates: ["teammate", "team", "peer", "partner"],
+  weighs: ["weigh", "tradeoff", "cost", "benefit", "balance", "priorit"],
+  tradeoffs: ["tradeoff", "cost", "benefit", "balance", "sacrifice", "priorit"],
+  identifies: ["identif", "list", "option", "choice", "find", "spot"],
+  options: ["option", "choice", "alternativ", "path"],
+  chooses: ["choose", "decide", "select", "pick"],
+  strategy: ["strateg", "plan", "approach", "method"],
+  revises: ["revise", "adjust", "change", "iterat", "redo", "refine", "improve", "redesign"],
+  consequences: ["consequence", "result", "outcome", "fail"],
+  explains: ["explain", "justif", "reason", "because", "defend"],
+  reasoning: ["reason", "justif", "because", "logic", "explain"],
+  separates: ["separat", "sort", "distinguish", "categoriz"],
+  evidence: ["evidence", "proof", "cite", "source", "data", "record", "document"],
+  inference: ["infer", "conclude", "interpret"],
+  tests: ["test", "try", "experiment", "check", "trial"],
+  assumptions: ["assum", "guess", "belief", "bias"],
+  contradictions: ["contradict", "conflict", "mismatch", "inconsist"],
+  claims: ["claim", "statement", "assert"],
+  cites: ["cite", "source", "reference", "proof"],
+  checks: ["check", "verif", "confirm", "inspect"],
+  source: ["source", "origin", "author", "reliab"],
+  compares: ["compare", "contrast", "match", "versus"],
+  verifies: ["verif", "confirm", "check", "prove"],
+  missing: ["missing", "gap", "absent", "unknown"],
+  documents: ["document", "record", "log", "write"],
+  monitors: ["monitor", "track", "measure", "progress"],
+  feedback: ["feedback", "critique", "review", "coach"],
+  paraphrases: ["paraphrase", "restate", "summariz", "own words"],
+  repairs: ["repair", "fix", "restore", "mend", "reconcil"],
+  confusion: ["confus", "unclear", "misunderstand"],
+  viewpoints: ["viewpoint", "perspective", "angle", "side", "stakeholder"],
+  stakeholder: ["stakeholder", "role", "party", "group", "need"],
+  empathy: ["empath", "feel", "care", "understand"],
+  values: ["value", "principle", "belief", "fair", "honest", "ethic"],
+  resists: ["resist", "refuse", "avoid", "stand"],
+  shortcuts: ["shortcut", "cheat", "easy way"],
+  impact: ["impact", "harm", "affect", "consequence", "repair"],
+  prototypes: ["prototype", "build", "make", "construct", "model", "design"],
+  ideas: ["idea", "concept", "design"],
+  iterates: ["iterat", "redesign", "revise", "improve", "refine", "retry"],
+  constraints: ["constraint", "limit", "budget", "rule"],
+  emotions: ["emotion", "feeling", "mood"],
+  reactions: ["reaction", "impulse", "response", "emotion"],
+  regulates: ["regulat", "calm", "breathe", "reset", "cool", "manage"],
+  social: ["social", "cue", "signal", "body"],
+  peers: ["peer", "teammate", "partner"],
+  conflict: ["conflict", "disagree", "argue", "tension", "repair"],
+  names: ["name", "label", "identif", "state"],
+  calibrates: ["calibrat", "confidence", "estimate", "predict"],
+  confidence: ["confidence", "sure", "certain", "estimate"],
+};
+
+function expandBehavior(b: string): string[] {
+  const out = new Set<string>();
+  for (const w of norm(b).split(" ").filter((w) => w.length > 3)) {
+    out.add(w);
+    (BEHAVIOR_SYNONYMS[w] ?? []).forEach((s) => out.add(s));
+  }
+  return [...out];
+}
+
+/**
+ * How strongly a seed makes students ACTIVELY DEMONSTRATE the target behavior.
+ * Matches the behavior's action words + synonyms against the seed's actual task
+ * text (Students Will / mechanism / rules / rounds / evidence), not the generic
+ * shared behavior list.
+ */
+function behaviorScore(row: Row, behaviors: string[]): number {
+  if (!behaviors.length) return 0;
+  const hay = norm(
+    `${cell(row, "Students Will Statement")} ${cell(row, "Competency Mechanism")} ${cell(row, "Rules")} ` +
+      `${cell(row, "Round 1")} ${cell(row, "Round 2")} ${cell(row, "Round 3")} ${cell(row, "Success Criteria")} ` +
+      `${cell(row, "Assessment Evidence")}`
+  );
+  let best = 0;
+  for (const b of behaviors) {
+    if (hay.includes(norm(b))) {
+      best = Math.max(best, 70);
+      continue;
+    }
+    const kws = expandBehavior(b);
+    const distinct = new Set(kws.filter((k) => hay.includes(k))).size;
+    best = Math.max(best, Math.min(60, distinct * 22));
+  }
+  return best;
 }
 
 /** Score one seed for a query. Returns -1 if it fails a required filter. */
@@ -73,11 +196,15 @@ function scoreSeed(row: Row, q: Query): number {
   else if (secondary === qc) score += 45;
   else return -1;
 
-  // 2 Dyad (required)
+  // 2 Competency behavior (immediately after competency) — the strongest ranking
+  // signal: prefer seeds that make students actively DEMONSTRATE today's behavior.
+  score += behaviorScore(row, q.behaviors);
+
+  // 3 Dyad (required)
   if (cell(row, "Grade Band") !== q.band) return -1;
   score += 80;
 
-  // 3 Design Model (via Experience Phase)
+  // 4 Design Model (via Experience Phase)
   const phase = cell(row, "Experience Phase");
   if ((DESIGN_MODEL_PHASES[q.designKey] ?? []).includes(phase)) score += 40;
 
@@ -178,10 +305,17 @@ export function retrieveGenomeForWeek(scope: ScopeSequence, week: number): strin
   const band = dyadToBand(scope.gradeBand);
   if (!wk || !eg || !band) return "";
 
+  const behaviorList = competencyBehaviorList(scope.competency);
+  const targetBehaviors = new Set<string>();
+
   const chosen = new Map<string, { row: Row; score: number }>();
   for (const day of wk.days) {
+    const dayText = [day.rubricIndicator, day.lo, day.experienceObjective, day.activity].filter(Boolean).join(" ");
+    const behaviors = pickDayBehaviors(behaviorList, dayText);
+    behaviors.forEach((b) => targetBehaviors.add(b));
     const q: Query = {
       competency: scope.competency,
+      behaviors,
       band,
       designKey: canonicalLessonType(day.lessonType),
       rubricIndicator: day.rubricIndicator,
@@ -219,7 +353,10 @@ export function retrieveGenomeForWeek(scope: ScopeSequence, week: number): strin
   const qc = norm(scope.competency);
 
   const blocks = [
-    `RETRIEVED EXPERIENCE SEEDS (${seeds.length}) — ranked by competency, dyad, Design Model, rubric indicator, product, materials, quality:`,
+    targetBehaviors.size
+      ? `TARGET COMPETENCY BEHAVIORS THIS WEEK (choose patterns where students ACTIVELY DEMONSTRATE these, never merely discuss them): ${[...targetBehaviors].join("; ")}`
+      : "",
+    `RETRIEVED EXPERIENCE SEEDS (${seeds.length}) — ranked by competency, competency behavior, dyad, Design Model, rubric indicator, product, materials, quality:`,
     seeds.map(renderSeed).join("\n\n"),
     renderCollection(
       "COMPETENCY BEHAVIORS (observable evidence for this competency):",
