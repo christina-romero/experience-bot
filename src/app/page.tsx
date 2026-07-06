@@ -12,10 +12,8 @@ import {
   exportLessonWeekDocx,
   scopeSequenceDocxBase64,
   scopeSequenceFileName,
-  lessonWeekDocxBase64,
-  lessonWeekFileName,
 } from "@/lib/export-docx";
-import { exportSlideDeckPptx, slideDeckPptxBase64, slideDeckFileName } from "@/lib/export-pptx";
+import { exportSlideDeckPptx } from "@/lib/export-pptx";
 import { canonicalLessonType } from "@/lib/template-registry";
 
 const COMPETENCIES = [
@@ -385,28 +383,12 @@ export default function Page() {
                         <Button variant="ghost" onClick={genWeek(wk.week)} disabled={busy !== null || weekApproved[wk.week]}>
                           Regenerate
                         </Button>
-                        <Button variant="secondary" disabled={busy !== null} onClick={fillWeekTemplate(generated)}>
-                          {busy === `tmpl-week-${wk.week}` ? "Copying…" : "Copy Google Doc (week)"}
+                        <Button variant="primary" disabled={busy !== null} onClick={fillWeekTemplate(generated)}>
+                          {busy === `tmpl-week-${wk.week}` ? "Creating…" : "Create from template → Drive"}
                         </Button>
-                        <Button variant="secondary" onClick={() => exportLessonWeekDocx(scope, generated)}>
-                          Download draft (.docx)
+                        <Button variant="ghost" onClick={() => exportLessonWeekDocx(scope, generated)}>
+                          Download draft only (.docx)
                         </Button>
-                        {driveEnabled && (
-                          <Button
-                            variant="secondary"
-                            disabled={busy !== null}
-                            onClick={publish(`publish-week-${wk.week}`, "doc", lessonWeekFileName(scope, generated), () =>
-                              lessonWeekDocxBase64(scope, generated)
-                            )}
-                          >
-                            {busy === `publish-week-${wk.week}` ? "Publishing…" : "Publish to Drive"}
-                          </Button>
-                        )}
-                        {links[`publish-week-${wk.week}`] && (
-                          <a href={links[`publish-week-${wk.week}`]} target="_blank" rel="noreferrer" className="text-sm text-brand-light underline">
-                            View in Drive ↗
-                          </a>
-                        )}
                         <Button
                           variant={weekApproved[wk.week] ? "success" : "primary"}
                           onClick={() => setWeekApproved((a) => ({ ...a, [wk.week]: !a[wk.week] }))}
@@ -456,8 +438,8 @@ export default function Page() {
                   </h3>
                   <div className="flex flex-wrap items-center gap-2">
                     {!deck && (
-                      <Button variant="secondary" disabled={busy !== null} onClick={fillTemplate(plan, "slides")}>
-                        {busy === `tmpl-${plan.day}` ? "Filling template…" : "Fill deck template → Drive"}
+                      <Button variant="primary" disabled={busy !== null} onClick={fillTemplate(plan, "slides")}>
+                        {busy === `tmpl-${plan.day}` ? "Creating…" : "Create from template → Drive"}
                       </Button>
                     )}
                     {!deck ? (
@@ -469,28 +451,12 @@ export default function Page() {
                         <Button variant="ghost" onClick={genDeck(plan)} disabled={busy !== null || deckApproved[plan.day]}>
                           Regenerate
                         </Button>
-                        <Button variant="secondary" disabled={busy !== null} onClick={fillTemplate(plan, "slides")}>
-                          {busy === `tmpl-${plan.day}` ? "Copying…" : "Copy Google Slides template"}
+                        <Button variant="primary" disabled={busy !== null} onClick={fillTemplate(plan, "slides")}>
+                          {busy === `tmpl-${plan.day}` ? "Creating…" : "Create from template → Drive"}
                         </Button>
-                        <Button variant="secondary" onClick={() => exportSlideDeckPptx(deck, scope)}>
-                          Download draft (.pptx)
+                        <Button variant="ghost" onClick={() => exportSlideDeckPptx(deck, scope)}>
+                          Download draft only (.pptx)
                         </Button>
-                        {driveEnabled && (
-                          <Button
-                            variant="secondary"
-                            disabled={busy !== null}
-                            onClick={publish(`publish-deck-${plan.day}`, "slides", slideDeckFileName(deck, scope), () =>
-                              slideDeckPptxBase64(deck)
-                            )}
-                          >
-                            {busy === `publish-deck-${plan.day}` ? "Publishing…" : "Publish to Drive"}
-                          </Button>
-                        )}
-                        {links[`publish-deck-${plan.day}`] && (
-                          <a href={links[`publish-deck-${plan.day}`]} target="_blank" rel="noreferrer" className="text-sm text-brand-light underline">
-                            View in Drive ↗
-                          </a>
-                        )}
                         <Button
                           variant={deckApproved[plan.day] ? "success" : "primary"}
                           onClick={() => setDeckApproved((a) => ({ ...a, [plan.day]: !a[plan.day] }))}
