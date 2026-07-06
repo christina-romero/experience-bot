@@ -319,17 +319,14 @@ function renderCollection(title: string, sheetName: string, filter?: (r: Row) =>
   return `${title}\n${lines.join("\n")}`;
 }
 
-/**
- * Retrieve the relevant Genome slice for a whole week: union of the top seeds
- * per day (competency + dyad required, ranked by Design Model + indicator +
- * product + materials + quality), clamped to ~5-15, plus supporting collections.
- * Returns "" when nothing matches so generation simply proceeds without it.
- */
-export function retrieveGenomeForWeek(scope: ScopeSequence, week: number): string {
+type Selection = { seeds: Row[]; targetBehaviors: string[]; behaviorList: string[] };
+
+/** The complementary Genome selection for a week (shared by prompt text + debug). */
+function runRetrieval(scope: ScopeSequence, week: number): Selection {
   const wk = scope.weeks.find((w) => w.week === week);
   const eg = sheet("Experience Genome");
   const band = dyadToBand(scope.gradeBand);
-  if (!wk || !eg || !band) return "";
+  if (!wk || !eg || !band) return { seeds: [], targetBehaviors: [], behaviorList: [] };
 
   const behaviorList = competencyBehaviorList(scope.competency);
   const targetBehaviors = new Set<string>();
@@ -391,6 +388,16 @@ export function retrieveGenomeForWeek(scope: ScopeSequence, week: number): strin
   }
   for (const [p, c] of byPhase) if (!PHASE_ORDER.includes(p)) selected.push(c);
   const seeds = selected.slice(0, 7).map((x) => x.row);
+  return { seeds, targetBehaviors: [...targetBehaviors], behaviorList };
+}
+
+/**
+ * Retrieve the relevant Genome slice for a whole week as prompt text: the
+ * complementary seed set (one strong pattern per phase) plus the supporting
+ * collections. Returns "" when nothing matches so generation proceeds without it.
+ */
+export function retrieveGenomeForWeek(scope: ScopeSequence, week: number): string {
+  const { seeds, targetBehaviors } = runRetrieval(scope, week);
   if (seeds.length === 0) return "";
 
   // Struggles referenced by the chosen seeds (for the Productive Struggles slice).
@@ -398,8 +405,8 @@ export function retrieveGenomeForWeek(scope: ScopeSequence, week: number): strin
   const qc = norm(scope.competency);
 
   const blocks = [
-    targetBehaviors.size
-      ? `TARGET COMPETENCY BEHAVIORS THIS WEEK (choose patterns where students ACTIVELY DEMONSTRATE these, never merely discuss them): ${[...targetBehaviors].join("; ")}`
+    targetBehaviors.length
+      ? `TARGET COMPETENCY BEHAVIORS THIS WEEK (choose patterns where students ACTIVELY DEMONSTRATE these, never merely discuss them): ${targetBehaviors.join("; ")}`
       : "",
     `COMPLEMENTARY EXPERIENCE SEEDS (${seeds.length}) — the smallest set that covers the arc, one strong pattern per phase (Launch -> Skill Build -> Core Challenge -> Iteration -> Reflection -> Celebration), each selected by competency, competency behavior, dyad, and Design Model. These complement each other; do not treat them as separate workshops:`,
     seeds.map(renderSeed).join("\n\n"),
@@ -421,4 +428,26 @@ export function retrieveGenomeForWeek(scope: ScopeSequence, week: number): strin
     renderCollection("QUALITY GATE (every experience must pass these):", "Quality Gate"),
   ];
   return blocks.filter(Boolean).join("\n\n");
+}
+
+export type GenomeRetrievalDebug = {
+  seeds: { id: string; name: string; phase: string; primaryCompetency: string; fidelity: string }[];
+  targetBehaviors: string[];
+  competencyBehaviors: string[];
+};
+
+/** Structured view of what retrieval selected — for the developer DEBUG panel only. */
+export function retrieveGenomeDebug(scope: ScopeSequence, week: number): GenomeRetrievalDebug {
+  const { seeds, targetBehaviors, behaviorList } = runRetrieval(scope, week);
+  return {
+    seeds: seeds.map((r) => ({
+      id: cell(r, "Genome ID"),
+      name: cell(r, "Experience Name"),
+      phase: cell(r, "Experience Phase"),
+      primaryCompetency: cell(r, "Primary Competency"),
+      fidelity: cell(r, "Fidelity Rating"),
+    })),
+    targetBehaviors,
+    competencyBehaviors: behaviorList,
+  };
 }

@@ -84,6 +84,10 @@ export default function Page() {
 
   const [tmpl, setTmpl] = useState<Record<string, TemplateFillResult>>({});
 
+  // Developer-only DEBUG mode (enabled via ?debug=1; never shown to writers).
+  const [debugOn, setDebugOn] = useState(false);
+  const [weekDebug, setWeekDebug] = useState<Record<number, WeekDebug>>({});
+
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,6 +101,14 @@ export default function Page() {
       .then((r) => r.json())
       .then((d) => setDriveEnabled(!!d.enabled))
       .catch(() => setDriveEnabled(false));
+  }, []);
+
+  // Enable DEBUG via ?debug=1 (persisted); ?debug=0 clears it. Writers never do this.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("debug");
+    if (p === "1") localStorage.setItem("f2Debug", "1");
+    if (p === "0") localStorage.removeItem("f2Debug");
+    setDebugOn(localStorage.getItem("f2Debug") === "1");
   }, []);
 
   function guard(fn: () => Promise<void>, token: string) {
@@ -139,9 +151,11 @@ export default function Page() {
   const genWeek = (week: number) =>
     guard(async () => {
       if (!scope) return;
-      const data = await post<LessonWeek>("/api/generate/lesson-plans", { scope, week });
-      setWeeks((w) => ({ ...w, [week]: data }));
+      const data = await post<LessonWeek & { _debug?: WeekDebug }>("/api/generate/lesson-plans", { scope, week });
+      const { _debug, ...wk } = data;
+      setWeeks((w) => ({ ...w, [week]: wk }));
       setWeekApproved((a) => ({ ...a, [week]: false }));
+      if (_debug) setWeekDebug((d) => ({ ...d, [week]: _debug }));
     }, `week-${week}`);
 
   const genDeck = (plan: LessonPlan) =>
@@ -213,6 +227,17 @@ export default function Page() {
           <h1 className="text-2xl font-bold text-brand">Build an Experience</h1>
           {session?.user && (
             <div className="flex items-center gap-3 text-sm text-slate-600">
+              {debugOn && (
+                <button
+                  className="rounded bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-white"
+                  onClick={() => {
+                    localStorage.removeItem("f2Debug");
+                    setDebugOn(false);
+                  }}
+                >
+                  🐞 Debug ON — hide
+                </button>
+              )}
               <span>{session.user.email}</span>
               <button className="text-brand-light underline" onClick={() => signOut({ callbackUrl: "/signin" })}>
                 Sign out
@@ -434,6 +459,7 @@ export default function Page() {
                         );
                       })}
                     </div>
+                    {debugOn && weekDebug[wk.week] && <DebugPanel d={weekDebug[wk.week]} />}
                   </>
                 )}
               </Card>
@@ -700,6 +726,78 @@ function SourceFindings({ report }: { report: SourceReport }) {
           Scope &amp; Sequence is required to continue — add it above and analyze again.
         </div>
       )}
+    </div>
+  );
+}
+
+type WeekDebug = {
+  genome: {
+    seeds: { id: string; name: string; phase: string; primaryCompetency: string; fidelity: string }[];
+    targetBehaviors: string[];
+    competencyBehaviors: string[];
+  };
+  days: {
+    day: string;
+    designModel: string;
+    docTemplate: string;
+    slidesTemplate: string;
+    facilitation: { phase: string; move: string; kind: "adapted" | "new" | "library" }[];
+  }[];
+};
+
+// Developer-only diagnostics for a generated week. Rendered only in debug mode.
+function DebugPanel({ d }: { d: WeekDebug }) {
+  const kindColor = (k: string) =>
+    k === "adapted" ? "text-amber-300" : k === "new" ? "text-emerald-300" : "text-slate-400";
+  return (
+    <div className="mt-4 rounded-md border border-slate-700 bg-slate-900 p-3 text-xs text-slate-200">
+      <div className="mb-2 font-semibold text-slate-100">🐞 DEBUG — developer only</div>
+
+      <div className="mb-3 space-y-0.5">
+        <div className="font-semibold text-slate-300">Genome retrieval (week)</div>
+        <div className="text-slate-400">
+          Target competency behaviors: {d.genome.targetBehaviors.join("; ") || "—"}
+        </div>
+        <div className="text-slate-400">
+          Competency behaviors: {d.genome.competencyBehaviors.join("; ") || "—"}
+        </div>
+        <div className="text-slate-400">Top Genome patterns retrieved ({d.genome.seeds.length}):</div>
+        <ul className="ml-4 list-disc">
+          {d.genome.seeds.map((s) => (
+            <li key={s.id}>
+              {s.id} {s.name} <span className="text-slate-500">— {s.phase} · {s.primaryCompetency} · fidelity {s.fidelity}</span>
+            </li>
+          ))}
+          {d.genome.seeds.length === 0 && <li className="text-slate-500">none retrieved</li>}
+        </ul>
+      </div>
+
+      {d.days.map((day, i) => {
+        const adapted = day.facilitation.filter((f) => f.kind === "adapted");
+        const created = day.facilitation.filter((f) => f.kind === "new");
+        return (
+          <div key={i} className="mb-2 space-y-0.5 border-t border-slate-800 pt-2">
+            <div className="font-semibold text-slate-100">{day.day}</div>
+            <div className="text-slate-400">Design Model: <span className="text-slate-200">{day.designModel}</span></div>
+            <div className="text-slate-400">Lesson template: <span className="text-slate-200">{day.docTemplate}</span></div>
+            <div className="text-slate-400">Slide template: <span className="text-slate-200">{day.slidesTemplate}</span></div>
+            <div className="text-slate-400">Facilitation assets used:</div>
+            <ul className="ml-4 list-disc">
+              {day.facilitation.map((f, j) => (
+                <li key={j}>
+                  <span className={kindColor(f.kind)}>[{f.kind}]</span> {f.phase}: {f.move}
+                </li>
+              ))}
+            </ul>
+            <div className="text-slate-400">
+              Genome assets adapted: {adapted.length ? adapted.map((a) => a.phase).join(", ") : "none"}
+            </div>
+            <div className="text-slate-400">
+              Newly generated content: {created.length ? created.map((a) => a.phase).join(", ") : "none flagged"}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
