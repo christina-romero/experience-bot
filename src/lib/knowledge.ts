@@ -37,6 +37,31 @@ export const LESSON_TYPES = [
 
 export type GradeBand = (typeof GRADE_BANDS)[number];
 
+/** The Future 2 Curriculum Dictionary — authoritative terminology for ALL output. */
+export const CURRICULUM_DICTIONARY = `
+FUTURE 2 CURRICULUM DICTIONARY (AUTHORITATIVE — use these exact definitions in every lesson, slide, assessment, facilitator note, and validation; NEVER substitute terminology from other instructional models):
+
+COMPETENCY FRAMEWORK
+- Competency: a durable skill developed over time and across many Experiences through repeated practice, reflection, and authentic application. Never "completed" in a single lesson. Every lesson must intentionally strengthen the selected competency (e.g. Collaboration & Teamwork, Emotional Intelligence, Learning to Learn).
+- Rubric Indicator: a measurable, directly observable dimension of a competency; it sets the focus for a module or week (e.g. Strategic Contribution, Perspective Integration, Shared Accountability). Every lesson must provide opportunities to practice the day's Rubric Indicator.
+- Proficiency: observable demonstration at the expected developmental level for the dyad. Future 2 Proficiency Standard = Level 3 or higher on at least four of five rubric indicators, with no indicator at Level 1. Lessons build progressively toward proficiency, not immediately.
+- Progression: the intentional increase in competency sophistication across dyads (e.g. 3/4 Positive Contributor -> 5/6 Reliable Collaborator -> 7/8 Collaborative Leader). Always generate to the developmental level of the selected dyad.
+
+SCOPE & SEQUENCE TERMS
+- Lesson Objective (LO): the competency skill students develop today ("what competency skill are students practicing today?"). Competency-focused, describes learning (not an activity), supports the day's Rubric Indicator. Determine required competency evidence first, then write the LO.
+- Experience Objective (EO): the observable accomplishment students must complete to demonstrate the LO ("what must students accomplish during today's Experience?"). Strong EO = competency evidence + tangible deliverable + observable accomplishment + completion target. Describes what students ACCOMPLISH, not what they learn.
+- Activity: the authentic experiential task students participate in to accomplish the EO ("how will students demonstrate the competency?"). Must require students to DEMONSTRATE the competency, not merely discuss it.
+- Connection: a brief explanation of why today's Experience matters for competency development ("why are we doing this?"), explicitly linking to future competency growth.
+
+ASSESSMENT TERMS
+- Checkpoint: a formal assessment focused on a SINGLE Rubric Indicator; collects observable evidence, measures growth, and prepares students for the CPC. Typically five per module, one per Rubric Indicator.
+- Competency Performance Challenge (CPC): the culminating authentic performance assessment for an Experience where students demonstrate ALL Rubric Indicators simultaneously and independently. Never a traditional test. Every lesson should intentionally prepare students for the CPC.
+
+COMPETENCY AT-BAT: an authentic opportunity for students to ACTIVELY demonstrate the target competency through meaningful action (decisions, collaboration, communication, reflection, problem solving, performance, feedback, iteration) that generates observable evidence. Discussing a competency is NOT an at-bat. Every lesson must contain at least two meaningful at-bats, distributed across the lesson rather than concentrated in one activity. Growth comes from repeated at-bats, not explanation.
+
+AUTHORING CHAIN (never use these terms interchangeably): Lesson Objective (competency being developed) -> Experience Objective (observable accomplishment) -> Activity (experiential task) -> Observable Evidence -> Checkpoint or CPC Progression. If this chain is broken, redesign the lesson before rendering.
+`.trim();
+
 /** The Access Model non-negotiables + T2P bar (from access-model-constitution). */
 export const ACCESS_MODEL = `
 ACCESS MODEL CONSTITUTION — NON-NEGOTIABLES (governs everything):
@@ -182,6 +207,7 @@ export function governingContext(): string {
   return [
     "You are the F2 Experience Builder, an expert Future 2 / HISD curriculum designer.",
     "You design Experiences for Future 2 Schools (Houston ISD's AI-focused K-8 campuses) by implementing Alpha's Access Model. Everything you produce must clear the bar below. HISD's own initial plans do NOT meet it; do not imitate them.",
+    CURRICULUM_DICTIONARY,
     ACCESS_MODEL,
     ALPHA_QUALITY_BAR,
     WHAT_MUST_BE_TRUE,
