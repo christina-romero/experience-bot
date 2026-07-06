@@ -137,31 +137,29 @@ export async function POST(req: Request) {
     // ---- Template Match Check (after gating) ----
     const check = templateMatchCheck(placeholders, generated);
 
-    // ---- Render into a copied template (best-effort; validation stands either way) ----
-    // Every placeholder must be unique with exactly one destination; refuse to
-    // render an ambiguous template until the author makes duplicates unique.
+    // ---- Render into a copied template ----
+    // A repeated token is not an error: replaceAllText fills every occurrence
+    // with the same value, so a placeholder that legitimately appears more than
+    // once (e.g. {{REFLECTION_PROMPT}} on a slide and in its notes) just gets the
+    // same content in each spot. Duplicates are still reported for visibility.
     let filled: { id: string; webViewLink: string; shared: "ok" | "failed" | "skipped" } | null = null;
     let fillError: string | undefined;
-    if (duplicates.length) {
-      fillError = `Template has duplicate placeholders (each must be unique): ${duplicates.map(toToken).join(", ")}`;
-    } else {
-      try {
-        // [Competency]_[Dyad]_Week [#]_Day [#]_[Design Model]
-        const wk = plan.day.match(/week\s*(\d+)/i)?.[1] ?? "";
-        const dayNum = plan.day.match(/day\s*(\d+)/i)?.[1] ?? "";
-        const name = `${scope.competency}_${scope.gradeBand}_Week ${wk}_Day ${dayNum}_${plan.lessonType}`.replace(
-          /[/\\:*?"<>|]/g,
-          "-"
-        );
-        const shareWith = session?.user?.email ?? undefined;
-        const replacements = toReplacements(check.mapped);
-        filled =
-          wantKind === "slides"
-            ? await fillPresentationFromTemplate(templateId, replacements, name, shareWith)
-            : await fillDocumentFromTemplate(templateId, replacements, name, shareWith);
-      } catch (e) {
-        fillError = e instanceof Error ? e.message : "Template render failed.";
-      }
+    try {
+      // [Competency]_[Dyad]_Week [#]_Day [#]_[Design Model]
+      const wk = plan.day.match(/week\s*(\d+)/i)?.[1] ?? "";
+      const dayNum = plan.day.match(/day\s*(\d+)/i)?.[1] ?? "";
+      const name = `${scope.competency}_${scope.gradeBand}_Week ${wk}_Day ${dayNum}_${plan.lessonType}`.replace(
+        /[/\\:*?"<>|]/g,
+        "-"
+      );
+      const shareWith = session?.user?.email ?? undefined;
+      const replacements = toReplacements(check.mapped);
+      filled =
+        wantKind === "slides"
+          ? await fillPresentationFromTemplate(templateId, replacements, name, shareWith)
+          : await fillDocumentFromTemplate(templateId, replacements, name, shareWith);
+    } catch (e) {
+      fillError = e instanceof Error ? e.message : "Template render failed.";
     }
 
     return NextResponse.json({
