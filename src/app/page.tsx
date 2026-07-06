@@ -375,11 +375,14 @@ export default function Page() {
           {scope.weeks.map((wk) => {
             const prevApproved = wk.week === 1 || weekApproved[wk.week - 1];
             const generated = weeks[wk.week];
+            // Strip a redundant leading "Week N" from the parsed title so it isn't repeated.
+            const weekTitle = wk.title.replace(/^\s*week\s*\d+\s*[:\-–—]?\s*/i, "").trim();
             return (
               <Card key={wk.week} className="p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-base font-semibold">
-                    Week {wk.week}: {wk.title} <span className="text-slate-400">— {wk.indicator}</span>
+                    Week {wk.week}{weekTitle ? `: ${weekTitle}` : ""}{" "}
+                    <span className="text-slate-400">— {wk.indicator}</span>
                   </h3>
                   <div className="flex items-center gap-2">
                     {!generated ? (
