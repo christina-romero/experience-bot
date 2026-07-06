@@ -371,7 +371,26 @@ export function retrieveGenomeForWeek(scope: ScopeSequence, week: number): strin
       if (chosen.size >= 8) break;
     }
   }
-  const seeds = [...chosen.values()].sort((a, b) => b.score - a.score).slice(0, 15).map((x) => x.row);
+  // Complementary selection: keep the SMALLEST set that covers the arc. Take the
+  // single strongest seed per Experience Phase (Launch -> ... -> Celebration) so
+  // patterns complement each other instead of duplicating the same instructional
+  // problem. Redundant same-phase seeds are dropped in favor of the stronger one.
+  const ranked = [...chosen.values()].sort((a, b) => b.score - a.score);
+  const PHASE_ORDER = ["Launch", "Skill Build", "Core Challenge", "Iteration", "Reflection", "Celebration"];
+  const byPhase = new Map<string, { row: Row; score: number }>();
+  for (const c of ranked) {
+    const phase = cell(c.row, "Experience Phase") || "Other";
+    if (!byPhase.has(phase)) byPhase.set(phase, c); // ranked desc -> keep the STRONGEST per phase
+  }
+  // One strong pattern per phase, in arc order. No redundant same-phase seeds; if
+  // two patterns cover the same phase, only the stronger is kept.
+  const selected: { row: Row; score: number }[] = [];
+  for (const p of PHASE_ORDER) {
+    const c = byPhase.get(p);
+    if (c) selected.push(c);
+  }
+  for (const [p, c] of byPhase) if (!PHASE_ORDER.includes(p)) selected.push(c);
+  const seeds = selected.slice(0, 7).map((x) => x.row);
   if (seeds.length === 0) return "";
 
   // Struggles referenced by the chosen seeds (for the Productive Struggles slice).
@@ -382,7 +401,7 @@ export function retrieveGenomeForWeek(scope: ScopeSequence, week: number): strin
     targetBehaviors.size
       ? `TARGET COMPETENCY BEHAVIORS THIS WEEK (choose patterns where students ACTIVELY DEMONSTRATE these, never merely discuss them): ${[...targetBehaviors].join("; ")}`
       : "",
-    `RETRIEVED EXPERIENCE SEEDS (${seeds.length}) — ranked by competency, competency behavior, dyad, Design Model, rubric indicator, product, materials, quality:`,
+    `COMPLEMENTARY EXPERIENCE SEEDS (${seeds.length}) — the smallest set that covers the arc, one strong pattern per phase (Launch -> Skill Build -> Core Challenge -> Iteration -> Reflection -> Celebration), each selected by competency, competency behavior, dyad, and Design Model. These complement each other; do not treat them as separate workshops:`,
     seeds.map(renderSeed).join("\n\n"),
     renderCollection(
       "COMPETENCY BEHAVIORS (observable evidence for this competency):",
