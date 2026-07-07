@@ -135,68 +135,6 @@ export function lessonWeekPrompt(input: {
 }
 
 /**
- * Generate the field values for the tokenized Gradual Release & Discussion deck
- * template. Each field maps 1:1 to a {{TOKEN}} in the template. The *Notes
- * fields carry teacher facilitation (imperative guidance + engagement strategy +
- * possible student responses) and land in the slide's speaker notes.
- */
-export function grDeckTokensPrompt(input: {
-  scope: ScopeSequence;
-  plan: LessonWeek["plans"][number];
-}): string {
-  const rubric = input.scope.rubricText?.trim();
-  return [
-    `Produce the field values for a Gradual Release and Discussion student-facing deck, following the HISD authoring pattern. Ground everything in the approved lesson plan and the provided rubric. Return JSON only.`,
-    `DYAD: ${input.scope.gradeBand} | COMPETENCY: ${input.scope.competency} | TARGET INDICATOR: ${input.plan.rubricIndicator}`,
-    ``,
-    `APPROVED LESSON PLAN:`,
-    JSON.stringify(input.plan, null, 2),
-    ``,
-    rubric ? `AUTHORITATIVE RUBRIC (use its exact 5 indicator names and first-person "I..." look-fors):\n${rubric}\n` : ``,
-    `Field rules:`,
-    `- activity: one sentence naming the experience students do to demonstrate the competency.`,
-    `- Do Now (donow*): an opening scenario/question that activates prior knowledge; donowStem is a sentence stem ending in an ellipsis.`,
-    `- Stamp (stamp*): the key idea to stamp for the day; stampStem is n/a or a quick check stem.`,
-    `- Worked Scenario (ws*): a positive example scenario plus the question "what actions helped this group reach their goal"; wsStem ends in an ellipsis.`,
-    `- Rubric (ind1..ind5 and ind1Look..ind5Look): the five rubric indicator names in order, each with a first-person "I ..." statement of what it looks like. Emphasize the target indicator.`,
-    `- Help or Hurt (hoh*): a scenario asking whether a behavior helped or hurt the team goal and why; hohStem ends in an ellipsis.`,
-    `- Independent Task (it*): the run-it-cold independent task (for example sort scenarios, build a team definition, gallery walk); itStem ends in an ellipsis.`,
-    `- Reflection (reflectQ1..3): three individual written reflection questions.`,
-    `- Closure (closureKey): the one big idea to restate.`,
-    `- attribution: a citation line for any images used, for example "Created using Canva".`,
-    `- Every *Time field is minutes for that slide (for example "4 min"); *Notes fields carry teacher guidance as an imperative move ending with the engagement strategy in parentheses, plus 2 to 4 possible student responses.`,
-    `Style: no em dashes, no semicolons in student-facing text. Plain, concrete, age-appropriate for the dyad.`,
-  ].join("\n");
-}
-
-export function slideDeckPrompt(input: {
-  scope: ScopeSequence;
-  plan: LessonWeek["plans"][number];
-}): string {
-  return [
-    `Produce the Step 3 student-facing slide deck for ONE lesson, using the deck template for its lessonType and the HISD authoring pattern.`,
-    `COMPETENCY: ${input.scope.competency} | GRADE BAND: ${input.scope.gradeBand}`,
-    ``,
-    `THE APPROVED LESSON PLAN (build the deck to match it exactly):`,
-    JSON.stringify(input.plan, null, 2),
-    ``,
-    `Student-facing slides must be concise, visual, motivating, and action-oriented — a prompt or task students act on, not a wall of text. All teacher-facing facilitation belongs in teacherGuidance (speaker notes), never on the slide face. Foreground the competency at-bats: what students DO on each slide.`,
-    ``,
-    `ALPHA STYLE (match the Alpha student-facing standard): lead with the CHALLENGE or provocation students act on — never a definition or concept dump. The concept is named only AFTER students have attempted it, and that naming lives in teacherGuidance (speaker notes), not on the slide face. Each slide poses a hands-on task, a real choice, or a "which one, and why?" prompt. sentenceStems are student-completed frames that force reasoning (e.g. "We chose ___ because ___"). Frame the deck toward a real, publicly-judged demonstration with genuine stakes. Voice: direct, punchy, concrete, no filler.`,
-    ``,
-    `Build the slide array:`,
-    `- Slide 1 = title (kind "title") with the dyad, competency, rubric indicator, lesson type, LO, Experience Objective, and Activity in onSlide.`,
-    `- Slide 2 = materials (kind "materials") listing student and teacher materials.`,
-    `- Start each phase with a divider slide (kind "divider") whose heading reads "Slides XX to XX" and whose onSlide reads "For this section, plan for approximately: N minutes".`,
-    `- Every content slide (kind "content") carries: heading, onSlide (the student-facing prompt/scenario/task), time, sentenceStems (each ending in an ellipsis and matched by the possibleResponses), teacherGuidance (imperative, ends with the engagement strategy in parentheses), and 4-8 possibleResponses. Set phase to the color-coded phase name.`,
-    `- Include a reflection slide (kind "reflection") and a closure slide (kind "closure") near the end.`,
-    `- Final slide = attribution (kind "attribution") crediting any images/videos (e.g. created using Canva).`,
-    `- For a CPC or Live Performance deck, follow the CPC deck skeleton (Launch + sign off, The Challenge with the hard constraint, performance-day slides with the no-fly list, Individual Evidence, Put It to the Test, Reflection & Closure).`,
-    `Number slides sequentially in n. No em dashes or semicolons in student-facing text. Return the SlideDeck JSON only.`,
-  ].join("\n");
-}
-
-/**
  * TWO KINGS — STAGE A. Write the CANONICAL Access-Model design spine for a week
  * (the source of record, in Access language) BEFORE any HISD district format
  * exists. Each day gets the five protected elements: mechanism-based Why, earned

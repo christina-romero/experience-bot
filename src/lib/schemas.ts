@@ -123,29 +123,9 @@ export interface FidelityWeek {
   weekPass: boolean; // true only when every day passes
 }
 
-export interface Slide {
-  n: number;
-  kind: string; // "title" | "materials" | "divider" | "content" | "reflection" | "closure" | "attribution"
-  phase: string; // "Do Now" | "Direct Instruction" | "Guided Practice" | "Independent Practice" | ...
-  heading: string;
-  onSlide: string; // student-facing content
-  time: string;
-  sentenceStems: string[];
-  teacherGuidance: string;
-  possibleResponses: string[];
-}
-
-export interface SlideDeck {
-  day: string;
-  lessonTitle: string;
-  lessonType: string;
-  slides: Slide[];
-}
-
 // ---------- JSON Schemas for structured output ----------
 
 const str = { type: "string" } as const;
-const strArr = { type: "array", items: { type: "string" } } as const;
 
 const scopeDaySchema = {
   type: "object",
@@ -325,57 +305,4 @@ export const fidelityWeekSchema = {
     weekPass: { type: "boolean" },
   },
   required: ["week", "days", "weekPass"],
-} as const;
-
-// ---- Gradual Release & Discussion deck: values for the tokenized template ----
-
-export const GR_DECK_FIELDS = [
-  "activity",
-  "donowTime", "donowPrompt", "donowStem", "donowNotes",
-  "stampTime", "stampIdea", "stampStem", "stampNotes",
-  "wsTime", "wsScenario", "wsStem", "wsNotes",
-  "ind1", "ind1Look", "ind2", "ind2Look", "ind3", "ind3Look", "ind4", "ind4Look", "ind5", "ind5Look",
-  "hohTime", "hohScenario", "hohStem", "hohNotes",
-  "itTime", "itTask", "itStem", "itNotes",
-  "reflectQ1", "reflectQ2", "reflectQ3", "reflectNotes",
-  "closureKey", "closureNotes",
-  "attribution",
-] as const;
-
-export type GrDeckTokens = Record<(typeof GR_DECK_FIELDS)[number], string>;
-
-export const grDeckTokensSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: Object.fromEntries(GR_DECK_FIELDS.map((f) => [f, str])),
-  required: [...GR_DECK_FIELDS],
-} as const;
-
-const slideSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    n: { type: "integer" },
-    kind: str,
-    phase: str,
-    heading: str,
-    onSlide: str,
-    time: str,
-    sentenceStems: strArr,
-    teacherGuidance: str,
-    possibleResponses: strArr,
-  },
-  required: ["n", "kind", "phase", "heading", "onSlide", "time", "sentenceStems", "teacherGuidance", "possibleResponses"],
-} as const;
-
-export const slideDeckSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    day: str,
-    lessonTitle: str,
-    lessonType: str,
-    slides: { type: "array", items: slideSchema },
-  },
-  required: ["day", "lessonTitle", "lessonType", "slides"],
 } as const;

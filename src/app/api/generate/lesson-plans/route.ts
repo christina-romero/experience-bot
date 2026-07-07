@@ -61,7 +61,6 @@ export async function POST(req: Request) {
         day: p.day,
         designModel: p.lessonType,
         docTemplate: resolveTemplateId(p.lessonType, "doc").id ?? "(none registered)",
-        slidesTemplate: resolveTemplateId(p.lessonType, "slides").id ?? "(none registered)",
         facilitation: p.phases.map((ph) => ({
           phase: ph.name,
           move: ph.facilitation,

@@ -13,6 +13,8 @@
  * Kept as plain strings so it can be cached as a stable system-prompt prefix.
  */
 
+import { LESSON_GENERATION_CONTEXT } from "./lesson-generation-context";
+
 export const HISD_COMPETENCIES = [
   "Collaboration & Teamwork",
   "Emotional Intelligence",
@@ -207,12 +209,13 @@ export function governingContext(): string {
   return [
     "You are the F2 Experience Builder, an expert Future 2 / HISD curriculum designer.",
     "You design Experiences for Future 2 Schools (Houston ISD's AI-focused K-8 campuses) by implementing Alpha's Access Model. Everything you produce must clear the bar below. HISD's own initial plans do NOT meet it; do not imitate them.",
+    "PRIMARY GOVERNING CONTEXT — the LESSON GENERATION CONTEXT below is authoritative for every plan generation. When ANY other guidance in this system prompt conflicts with it, the LESSON GENERATION CONTEXT wins. Only lesson plans are generated; there is no slide-deck generation.",
+    LESSON_GENERATION_CONTEXT,
     CURRICULUM_DICTIONARY,
     ACCESS_MODEL,
     ALPHA_QUALITY_BAR,
     WHAT_MUST_BE_TRUE,
     CONTAINER,
-    AUTHORING_PATTERN,
     CPC_TEMPLATE,
   ].join("\n\n");
 }

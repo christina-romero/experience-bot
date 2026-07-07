@@ -1,19 +1,17 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Button, Banner, Card, Spinner } from "@/components/ui";
 import { ScopeSequenceEditor } from "@/components/ScopeSequenceEditor";
 import { LessonWeekEditor } from "@/components/LessonWeekEditor";
-import { SlideDeckEditor } from "@/components/SlideDeckEditor";
-import type { ScopeSequence, LessonWeek, SlideDeck, LessonPlan, CanonicalWeek, FidelityWeek } from "@/lib/schemas";
+import type { ScopeSequence, LessonWeek, CanonicalWeek, FidelityWeek } from "@/lib/schemas";
 import {
   exportScopeSequenceDocx,
   exportLessonWeekDocx,
   scopeSequenceDocxBase64,
   scopeSequenceFileName,
 } from "@/lib/export-docx";
-import { exportSlideDeckPptx } from "@/lib/export-pptx";
 import { canonicalLessonType } from "@/lib/template-registry";
 
 const COMPETENCIES = [
@@ -30,7 +28,7 @@ const COMPETENCIES = [
 ];
 const GRADE_BANDS = ["3/4", "5/6", "7/8"];
 
-type Stage = "config" | "scope" | "plans" | "decks";
+type Stage = "config" | "scope" | "plans";
 
 type DocVal = { text: string; base64?: string; name?: string; driveUrl?: string };
 
@@ -82,9 +80,6 @@ export default function Page() {
   const [fidelity, setFidelity] = useState<Record<number, FidelityWeek>>({});
   const [fidelityOverride, setFidelityOverride] = useState<Record<number, boolean>>({});
 
-  const [decks, setDecks] = useState<Record<string, SlideDeck>>({});
-  const [deckApproved, setDeckApproved] = useState<Record<string, boolean>>({});
-
   const [tmpl, setTmpl] = useState<Record<string, TemplateFillResult>>({});
 
   // Developer-only DEBUG mode (enabled via ?debug=1; never shown to writers).
@@ -128,7 +123,7 @@ export default function Page() {
     };
   }
 
-  function publish(token: string, kind: "doc" | "slides", name: string, makeBase64: () => Promise<string>) {
+  function publish(token: string, kind: "doc", name: string, makeBase64: () => Promise<string>) {
     return guard(async () => {
       const base64 = await makeBase64();
       const res = await post<{ webViewLink: string }>("/api/publish", { name, kind, base64 });
@@ -149,8 +144,6 @@ export default function Page() {
       setCanonical({});
       setFidelity({});
       setFidelityOverride({});
-      setDecks({});
-      setDeckApproved({});
     }
   }, "analyze");
 
@@ -178,25 +171,6 @@ export default function Page() {
       setFidelityOverride((o) => ({ ...o, [week]: false }));
     }, `fidelity-${week}`);
 
-  const genDeck = (plan: LessonPlan) =>
-    guard(async () => {
-      if (!scope) return;
-      const data = await post<SlideDeck>("/api/generate/slide-deck", { scope, plan });
-      setDecks((d) => ({ ...d, [plan.day]: data }));
-      setDeckApproved((a) => ({ ...a, [plan.day]: false }));
-    }, `deck-${plan.day}`);
-
-  // Copy the exact Google template (Doc or Slides) and fill its placeholders.
-  // No silent fallback to a non-template file: on failure the error is shown, and
-  // the clearly labeled "Download draft" buttons remain for a DOCX/PPTX draft.
-  const fillTemplate = (plan: LessonPlan, kind: "doc" | "slides") =>
-    guard(async () => {
-      if (!scope) return;
-      const res = await post<TemplateFillResult>("/api/template-fill", { scope, plan, kind });
-      setTmpl((t) => ({ ...t, [`${plan.day}:${kind}`]: { ...res, kind } }));
-      if (!res.file?.webViewLink && res.fillError) setError(res.fillError);
-    }, `tmpl-${plan.day}`);
-
   // One Google Doc per week: fill the whole week's plans into a single copied template.
   const fillWeekTemplate = (week: LessonWeek) =>
     guard(async () => {
@@ -210,20 +184,10 @@ export default function Page() {
       if (!res.file?.webViewLink && res.fillError) setError(res.fillError);
     }, `tmpl-week-${week.week}`);
 
-  const allPlans: LessonPlan[] = useMemo(
-    () =>
-      Object.keys(weeks)
-        .map(Number)
-        .sort((a, b) => a - b)
-        .flatMap((n) => weeks[n].plans),
-    [weeks]
-  );
-
   const steps: { key: Stage; label: string; enabled: boolean }[] = [
     { key: "config", label: "1. Inputs", enabled: true },
     { key: "scope", label: "2. Review S&S", enabled: !!scope },
     { key: "plans", label: "3. Lesson Plans", enabled: scopeApproved },
-    { key: "decks", label: "4. Slide Decks", enabled: Object.keys(weeks).length > 0 },
   ];
 
   return (
@@ -253,7 +217,7 @@ export default function Page() {
         </div>
         <p className="text-sm text-slate-600">
           Human-QC pipeline. Provide your inputs, then each stage generates a draft with Claude, you edit it in place,
-          approve the gate, and the next stage unlocks. Download .docx / .pptx or publish to Drive at every stage.
+          approve the gate, and the next stage unlocks. Download .docx or publish to Drive at every stage.
         </p>
       </header>
 
@@ -464,63 +428,6 @@ export default function Page() {
         </div>
       )}
 
-      {/* STAGE 4: SLIDE DECKS */}
-      {stage === "decks" && scope && (
-        <div className="space-y-4">
-          {allPlans.length === 0 && <Banner tone="info">Generate at least one week of lesson plans to unlock its slide decks.</Banner>}
-          {allPlans.map((plan) => {
-            const deck = decks[plan.day];
-            return (
-              <Card key={plan.day} className="p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-base font-semibold">
-                    {plan.day}: {plan.lessonTitle} <span className="text-slate-400">— {plan.lessonType}</span>
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {!deck && (
-                      <Button variant="primary" disabled={busy !== null} onClick={fillTemplate(plan, "slides")}>
-                        {busy === `tmpl-${plan.day}` ? "Creating…" : "Create from template → Drive"}
-                      </Button>
-                    )}
-                    {!deck ? (
-                      <Button onClick={genDeck(plan)} disabled={busy !== null}>
-                        {busy === `deck-${plan.day}` ? "Generating…" : "Generate deck"}
-                      </Button>
-                    ) : (
-                      <>
-                        <Button variant="ghost" onClick={genDeck(plan)} disabled={busy !== null || deckApproved[plan.day]}>
-                          Regenerate
-                        </Button>
-                        <Button variant="primary" disabled={busy !== null} onClick={fillTemplate(plan, "slides")}>
-                          {busy === `tmpl-${plan.day}` ? "Creating…" : "Create from template → Drive"}
-                        </Button>
-                        <Button variant="ghost" onClick={() => exportSlideDeckPptx(deck, scope)}>
-                          Download draft only (.pptx)
-                        </Button>
-                        <Button
-                          variant={deckApproved[plan.day] ? "success" : "primary"}
-                          onClick={() => setDeckApproved((a) => ({ ...a, [plan.day]: !a[plan.day] }))}
-                        >
-                          {deckApproved[plan.day] ? "✓ Approved (Gate 3)" : "Approve Gate 3"}
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-                {busy === `deck-${plan.day}` && <Spinner label="Building the student-facing deck…" />}
-                {tmpl[`${plan.day}:slides`] && <MatchCheck r={tmpl[`${plan.day}:slides`]} />}
-                {deck && (
-                  <SlideDeckEditor
-                    deck={deck}
-                    readOnly={deckApproved[plan.day]}
-                    onChange={(d) => setDecks((prev) => ({ ...prev, [plan.day]: d }))}
-                  />
-                )}
-              </Card>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
@@ -817,7 +724,6 @@ type WeekDebug = {
     day: string;
     designModel: string;
     docTemplate: string;
-    slidesTemplate: string;
     facilitation: { phase: string; move: string; kind: "adapted" | "new" | "library" }[];
   }[];
 };
@@ -857,7 +763,6 @@ function DebugPanel({ d }: { d: WeekDebug }) {
             <div className="font-semibold text-slate-100">{day.day}</div>
             <div className="text-slate-400">Design Model: <span className="text-slate-200">{day.designModel}</span></div>
             <div className="text-slate-400">Lesson template: <span className="text-slate-200">{day.docTemplate}</span></div>
-            <div className="text-slate-400">Slide template: <span className="text-slate-200">{day.slidesTemplate}</span></div>
             <div className="text-slate-400">Facilitation assets used:</div>
             <ul className="ml-4 list-disc">
               {day.facilitation.map((f, j) => (
@@ -970,7 +875,7 @@ type TemplateFillResult = {
   facilitation: { field: string; verdict: string; reasons: string }[];
   file: { id: string; webViewLink: string; shared?: "ok" | "failed" | "skipped" } | null;
   fillError?: string;
-  kind?: "doc" | "slides";
+  kind?: "doc";
 };
 
 // Template Match Check panel: what mapped, what is missing / unmapped / duplicated,
@@ -982,9 +887,9 @@ function MatchCheck({ r }: { r: TemplateFillResult }) {
     <div className="mt-3 space-y-1 border-t border-slate-100 pt-2 text-xs">
       {r.file?.webViewLink && (
         <div className="rounded-md border border-green-300 bg-green-50 px-2 py-1.5 text-green-800">
-          <div className="font-semibold">✓ {r.kind === "slides" ? "Slide Deck" : "Lesson Plan"} created</div>
+          <div className="font-semibold">✓ Lesson Plan created</div>
           <a href={r.file.webViewLink} target="_blank" rel="noreferrer" className="text-brand-light underline">
-            Open Google {r.kind === "slides" ? "Slides" : "Doc"} ↗
+            Open Google Doc ↗
           </a>
           {r.file.shared === "ok" && <div className="mt-0.5">Shared with your Google account.</div>}
           {r.file.shared === "failed" && (
