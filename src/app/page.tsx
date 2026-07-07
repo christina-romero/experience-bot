@@ -27,6 +27,8 @@ const COMPETENCIES = [
   "Innovation & Design Thinking",
 ];
 const GRADE_BANDS = ["3/4", "5/6", "7/8"];
+// Competencies whose Cycle-1 Scope & Sequence is built into the bot (no upload).
+const BUILTIN_COMPETENCIES = ["Collaboration & Teamwork", "Emotional Intelligence"];
 
 type Stage = "config" | "scope" | "plans";
 
@@ -131,6 +133,21 @@ export default function Page() {
       window.open(res.webViewLink, "_blank");
     }, token);
   }
+
+  // Load the built-in Cycle-1 Scope & Sequence for the selected competency + dyad.
+  // No upload, no parse — the S&S is locked into the bot's operating system.
+  const loadBuiltinScope = guard(async () => {
+    const res = await post<{ scope: ScopeSequence }>("/api/scope/builtin", { competency, gradeBand });
+    setScope(res.scope);
+    setScopeApproved(false);
+    setWeeks({});
+    setWeekApproved({});
+    setCanonical({});
+    setFidelity({});
+    setFidelityOverride({});
+    setSourceReport(null);
+    setStage("scope");
+  }, "builtin");
 
   const analyzeSources = guard(async () => {
     const payloads = sources.filter(docFilled).map(docPayload);
@@ -250,12 +267,11 @@ export default function Page() {
       {/* STAGE 1: INPUTS */}
       {stage === "config" && (
         <Card className="p-5">
-          <h2 className="mb-1 text-lg font-semibold">Step 1 — Experience Sources</h2>
+          <h2 className="mb-1 text-lg font-semibold">Step 1 — Choose the Experience</h2>
           <p className="mb-4 text-sm text-slate-600">
-            Choose the competency and dyad, then drop in the Experience-specific documents — Scope &amp; Sequence, CPC,
-            rubric, previous lessons, and notes — as Google Doc/Sheet/folder links, files, or pasted text, in any mix.
-            The Future2 Genome and templates are built in, so you never upload those. The app sorts each source, shows
-            what it found, and asks only for what is missing.
+            Pick the competency and dyad, then load the built-in Scope &amp; Sequence. The Cycle 1 S&amp;S, rubrics, CPC
+            frames, and the Future2 Genome are all built into the bot, so no upload is required. Adding your own sources
+            is optional.
           </p>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
@@ -275,9 +291,31 @@ export default function Page() {
               </select>
             </label>
           </div>
+
+          <div className="mt-4 rounded-md border border-brand/40 bg-blue-50 p-4">
+            <div className="text-sm font-semibold text-slate-800">Built-in Scope &amp; Sequence</div>
+            <p className="mt-0.5 text-xs text-slate-600">
+              The Cycle 1 S&amp;S is locked into the bot — load it for the selected competency and dyad. No upload needed.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <Button
+                variant="primary"
+                onClick={loadBuiltinScope}
+                disabled={busy !== null || !BUILTIN_COMPETENCIES.includes(competency)}
+              >
+                {busy === "builtin" ? "Loading…" : `Load built-in Scope & Sequence (${gradeBand})`}
+              </Button>
+              {!BUILTIN_COMPETENCIES.includes(competency) && (
+                <span className="text-xs text-slate-500">
+                  Built in for Collaboration &amp; Teamwork and Emotional Intelligence.
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="mt-4">
             <div className="mb-2 flex items-center justify-between">
-              <span className="label">Experience Sources</span>
+              <span className="label">Optional: your own sources (override or enrich the built-in S&amp;S)</span>
               <button
                 className="text-xs font-medium text-brand-light underline"
                 onClick={() => setSources((s) => [...s, { text: "" }])}
