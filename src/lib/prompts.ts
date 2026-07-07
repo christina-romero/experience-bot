@@ -124,6 +124,7 @@ export function lessonWeekPrompt(input: {
     `- whatMustBeTrue: give a SPECIFIC checkable mechanic for each of readWrite, noOptOut, urgency, groupings (no general statements).`,
     `- materials: exact student + teacher materials (low cost, reusable).`,
     `- phases: the ordered phases for this Design Model, minutes summing to ~55, each with a slideMapping label, run-it-cold steps, a named facilitation move, sentence stems, and teacher guidance. Sequence the phases EXPERIENCE-FIRST: a hands-on challenge or attempt with minimal instruction, THEN a brief reveal that names the concept from what students produced, THEN autonomous practice/application, THEN a closing framing statement. runItColdSteps describe what STUDENTS DO (a physical, active task), not what the teacher says. teacherGuidance defaults to observe / time / redirect ownership ("Make a team decision") and deliberately caps teacher talk. sentenceStems are student-completed frames that force reasoning and self-diagnosis. Weave competency at-bats across every phase.`,
+    `- OPENER RED FLAG (reject and rewrite): the Do Now / opening block must be an IN-ACTION move tied to the day's real vehicle — students immediately DO something physical (build, sort a real object, run a quick round, make and post a real decision). A Do Now that is "write one quick idea on your tracker", "pick an option and write why", or any solo write/discuss prompt is REJECTED. Do not open by naming or defining the skill. Every block, not only the core, favors students DOING over writing or talking.`,
     `- For a CPC or Live Performance day: include the CPC Launch sign-off (launch day) or the guide no-fly list + individual-evidence capture + binary live test (performance days), tied to the provided CPC.`,
     `- performanceCapture: for a CPC or Live Performance day, fill cpcLaunch (the launch and sign-off), challengeConstraint (the challenge and its one hard constraint), noFlyList (the guide no-fly list), individualEvidence (how each individual student's evidence is captured and scored), and binaryTest (the pass/fail condition observed live). For any non-CPC, non-performance day, set ALL five fields to an empty string.`,
     `- assessment matches the S&S row.`,
@@ -160,12 +161,19 @@ export function canonicalWeekPrompt(input: { scope: ScopeSequence; week: number;
     genome ? `RETRIEVED FUTURE2 GENOME (patterns to recombine, never copy):\n${genome}\n` : ``,
     `ACCESS DESIGN LAWS (every day must honor them): autonomy is EARNED (not granted by pacing); systems > subjects (content is the vehicle, the student operating-system is the product); if it does not work it is not finished (mastery proven by function, not completion); belonging follows contribution; capability is forged through friction (preserve productive struggle, ban adult rescue).`,
     ``,
+    `EXPERIENTIAL MANDATES from the LESSON GENERATION CONTEXT (design each day to these, not to a generic worksheet rhythm):`,
+    `- IN-ACTION CORE (§2): every day is anchored by a hands-on, do-it-live activity where students practice the skill in the body, in the moment (build it, play it, run the round, carry the role) — NOT by discussion or a "write your idea on the tracker" task. Discussion and reflection only wrap the experiential core; they never replace it. A day that is all writing/talking is rejected.`,
+    `- REAL VEHICLE (§2A): the scenario is recognizable and real to a student in the ${input.scope.gradeBand} dyad (a class job that got dropped, a group project falling apart, coordinating the cafeteria line, fixing something real on campus) with real stakes — NOT an invented fantasy premise (lost explorers, missing artifacts) and NOT a cosmetic local veneer. Apply this strictly to Practice/Performance/CPC days; Invisible Sims may stay abstract.`,
+    `- EXPERIENCE BEFORE INSTRUCTION / INVISIBLE ENTRY (§3, §4): where an arc applies, the skill is practiced BEFORE it is named — an Invisible Sim (a game/puzzle/competition) surfaces the skill only in the debrief. Never front-load a definition or lecture. Gradual Release days end on an embedded low-stakes practice that feels fun, not a reflection prompt.`,
+    `- FUN and 30:1: the activity should be genuinely fun, and it must run at one guide per ~30 students with no bottleneck adult delivering or rescuing.`,
+    `The mechanismWhy, unlock, and binaryCheck2Pass you write for each day must reflect THIS in-action, real-vehicle mechanism — not a generic "practice the competency" framing.`,
+    ``,
     `For EACH day in this week, produce the canonical spine (Access language, concrete, no district formatting):`,
     `- mechanismWhy: the student CAPABILITY being built today and the MECHANISM that builds it (how the activity forges the skill). Never "produces evidence for a rubric".`,
     `- unlock: what students EARN by demonstrating readiness today — a specific autonomy or harder challenge that unlocks from PROOF, never from permission, pacing, or finishing early. Name the trigger and the reward.`,
     `- binaryCheck2Pass: a PASS/FAIL success condition against an external quality bar (the object works or it does not; the plan meets the non-negotiable constraints or it does not). Observable, un-fakeable, pointed at the CPC. No "students will understand / participate / complete".`,
     `- gradeBandEscalation: how THIS day is harder for the ${input.scope.gradeBand} dyad than for the band below — via complexity, responsibility, interdependence, or independence. Be specific about what scales.`,
-    `- guideMoves: what the guide DOES — facilitate, coach, question, observe, hold the line. Silent-facilitator default (set the challenge, start the timer, redirect ownership). Never lecture-deliver, never rescue. Must run at a 20:1 ratio without a bottleneck adult.`,
+    `- guideMoves: what the guide DOES — facilitate, coach, question, observe, hold the line. Silent-facilitator default (set the challenge, start the timer, redirect ownership). Never lecture-deliver, never rescue. Must run at a 30:1 ratio without a bottleneck adult.`,
     ``,
     `Return CanonicalWeek JSON only: { week, days: [ { day, mechanismWhy, unlock, binaryCheck2Pass, gradeBandEscalation, guideMoves } ] } — one entry per day in this week, in order. No em dashes or semicolons.`,
   ]
@@ -184,7 +192,7 @@ export function fidelityGatePrompt(input: {
   week: LessonWeek;
 }): string {
   return [
-    `You are the TWO KINGS FIDELITY GATE — an adversarial reviewer. Diff the HISD-facing DERIVATIVE lesson plans against the CANONICAL Access spine they were meant to render. Judge ONLY the four protected fields, per day. Catch DILUTION: where the district render softened, dropped, generalized, or replaced the canonical mechanism. Be strict; default to FAIL when a protected element is vague, softened, or missing.`,
+    `You are the TWO KINGS FIDELITY GATE — an adversarial reviewer. Diff the HISD-facing DERIVATIVE lesson plans against the CANONICAL Access spine they were meant to render, AND audit each day against the LESSON GENERATION CONTEXT. Judge FIVE protected fields, per day. Catch DILUTION and any red flag from the context. Be strict; default to FAIL when a protected element is vague, softened, missing, or a red flag is present.`,
     `COMPETENCY: ${input.scope.competency} | DYAD: ${input.scope.gradeBand}`,
     ``,
     `CANONICAL SPINE (source of record, per day):`,
@@ -193,12 +201,13 @@ export function fidelityGatePrompt(input: {
     `HISD DERIVATIVE (the rendered lesson plans to audit):`,
     JSON.stringify(input.week, null, 2),
     ``,
-    `For EACH day (match by the day label), judge the four protected fields. Set pass=true only if the derivative preserves the canonical intent; pass=false if it softened, dropped, generalized, or replaced it. Give a one-sentence note with concrete evidence (quote or paraphrase the offending derivative text, or state what preserves it):`,
+    `For EACH day (match by the day label), judge the five protected fields. Set pass=true only if it holds; pass=false if softened, dropped, generalized, replaced, or a red flag is present. Give a one-sentence note with concrete evidence (quote or paraphrase the offending derivative text, or state what preserves it):`,
     `- unlock: is an EARNED progression still explicit in the derivative and tied to demonstrated capability? FAIL if the unlock became blanket permission, disappeared, or is merely "early finishers get more".`,
     `- binaryMastery: is success still PASS/FAIL against an external bar? FAIL if it became "students will understand / participate / complete / discuss" or any open-ended completion language.`,
     `- mechanismWhy: does the derivative still build the capability by the canonical mechanism? FAIL if the Why drifted into rubric-evidence language or generic "practice the competency".`,
     `- escalation: is the grade-band escalation still present for the dyad? FAIL if it was collapsed to a single generic level.`,
-    `Set dayPass=true only when all four fields pass. Set weekPass=true only when every day passes.`,
+    `- experiential: does the day have a genuine IN-ACTION core (students physically DO the skill: build/play/run/carry a role), a REAL recognizable vehicle (not an invented fantasy premise or an "any city" generic scenario, for Practice/Performance/CPC days), and does it practice before naming (no front-loaded lecture/definition)? FAIL if the day is all discussion/writing (e.g. a Do Now that is "write one idea on your tracker" or "pick X and write why"), if the opener names or lectures the skill before students act, or if the scenario is a generic/fantasy premise. This is where thin, worksheet-style days get caught.`,
+    `Set dayPass=true only when ALL FIVE fields pass. Set weekPass=true only when every day passes.`,
     `Return FidelityWeek JSON only.`,
   ]
     .filter(Boolean)

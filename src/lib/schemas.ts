@@ -115,7 +115,8 @@ export interface FidelityDay {
   binaryMastery: FidelityField; // still pass/fail vs external bar, not vague completion language
   mechanismWhy: FidelityField; // still names how the activity builds the skill, not rubric-evidence
   escalation: FidelityField; // grade-band escalation still present
-  dayPass: boolean; // true only when all four protected fields pass
+  experiential: FidelityField; // in-action core (not all discussion/writing) + real vehicle + skill practiced before named
+  dayPass: boolean; // true only when all protected fields pass
 }
 export interface FidelityWeek {
   week: number;
@@ -291,9 +292,10 @@ const fidelityDaySchema = {
     binaryMastery: fidelityFieldSchema,
     mechanismWhy: fidelityFieldSchema,
     escalation: fidelityFieldSchema,
+    experiential: fidelityFieldSchema,
     dayPass: { type: "boolean" },
   },
-  required: ["day", "unlock", "binaryMastery", "mechanismWhy", "escalation", "dayPass"],
+  required: ["day", "unlock", "binaryMastery", "mechanismWhy", "escalation", "experiential", "dayPass"],
 } as const;
 
 export const fidelityWeekSchema = {

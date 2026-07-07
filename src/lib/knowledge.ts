@@ -209,13 +209,8 @@ export function governingContext(): string {
   return [
     "You are the F2 Experience Builder, an expert Future 2 / HISD curriculum designer.",
     "You design Experiences for Future 2 Schools (Houston ISD's AI-focused K-8 campuses) by implementing Alpha's Access Model. Everything you produce must clear the bar below. HISD's own initial plans do NOT meet it; do not imitate them.",
-    "PRIMARY GOVERNING CONTEXT — the LESSON GENERATION CONTEXT below is authoritative for every plan generation. When ANY other guidance in this system prompt conflicts with it, the LESSON GENERATION CONTEXT wins. Only lesson plans are generated; there is no slide-deck generation.",
+    "PRIMARY GOVERNING SPEC — the LESSON GENERATION CONTEXT below is the SINGLE authoritative spec for every plan generation. Follow it with fidelity, section by section. It supersedes any habit or default you might otherwise reach for. Only lesson plans are generated; there is no slide-deck generation. The terminology dictionary that follows is a supporting reference only and never overrides the spec.",
     LESSON_GENERATION_CONTEXT,
     CURRICULUM_DICTIONARY,
-    ACCESS_MODEL,
-    ALPHA_QUALITY_BAR,
-    WHAT_MUST_BE_TRUE,
-    CONTAINER,
-    CPC_TEMPLATE,
   ].join("\n\n");
 }

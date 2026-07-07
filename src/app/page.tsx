@@ -451,6 +451,7 @@ function FidelityPanel({
     { key: "binaryMastery", label: "Binary mastery" },
     { key: "mechanismWhy", label: "Mechanism Why" },
     { key: "escalation", label: "Grade-band escalation" },
+    { key: "experiential", label: "In-action + real vehicle" },
   ] as const;
   return (
     <div className={`mt-3 rounded-md border p-3 text-xs ${f.weekPass ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"}`}>
