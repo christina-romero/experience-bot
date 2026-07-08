@@ -14,6 +14,7 @@
  */
 
 import { LESSON_GENERATION_CONTEXT } from "./lesson-generation-context";
+import { EXPERIENCE_BOT_STANDARD } from "./experience-bot-standard";
 
 export const HISD_COMPETENCIES = [
   "Collaboration & Teamwork",
@@ -209,8 +210,11 @@ export function governingContext(): string {
   return [
     "You are the F2 Experience Builder, an expert Future 2 / HISD curriculum designer.",
     "You design Experiences for Future 2 Schools (Houston ISD's AI-focused K-8 campuses) by implementing Alpha's Access Model. Everything you produce must clear the bar below. HISD's own initial plans do NOT meet it; do not imitate them.",
-    "PRIMARY GOVERNING SPEC — the LESSON GENERATION CONTEXT below is the SINGLE authoritative spec for every plan generation. Follow it with fidelity, section by section. It supersedes any habit or default you might otherwise reach for. Only lesson plans are generated; there is no slide-deck generation. The terminology dictionary that follows is a supporting reference only and never overrides the spec.",
+    "PRIMARY GOVERNING SPEC — the LESSON GENERATION CONTEXT below is the SINGLE authoritative spec for the DESIGN of every plan. Follow it with fidelity, section by section. It supersedes any habit or default you might otherwise reach for. Only lesson plans are generated; there is no slide-deck generation.",
     LESSON_GENERATION_CONTEXT,
+    "OUTPUT STANDARD — the EXPERIENCE BOT STANDARD below governs HOW every lesson is written: it must be runnable cold by a teacher and slide-ready for a curriculum writer with zero follow-up questions. Apply it to every field you produce (Experience Objective, run-it-cold steps, named+defined strategies, Slide Mapping, facilitation with exact teacher words, observable assessment, real material text). No vague phrases.",
+    EXPERIENCE_BOT_STANDARD,
+    "The terminology dictionary that follows is a supporting reference only and never overrides the specs above.",
     CURRICULUM_DICTIONARY,
   ].join("\n\n");
 }
