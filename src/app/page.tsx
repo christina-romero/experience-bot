@@ -82,7 +82,6 @@ export default function Page() {
   const [fidelity, setFidelity] = useState<Record<number, FidelityWeek>>({});
   const [fidelityOverride, setFidelityOverride] = useState<Record<number, boolean>>({});
 
-  const [tmpl, setTmpl] = useState<Record<string, TemplateFillResult>>({});
 
   // Developer-only DEBUG mode (enabled via ?debug=1; never shown to writers).
   const [debugOn, setDebugOn] = useState(false);
@@ -189,18 +188,6 @@ export default function Page() {
     }, `fidelity-${week}`);
 
   // One Google Doc per week: fill the whole week's plans into a single copied template.
-  const fillWeekTemplate = (week: LessonWeek) =>
-    guard(async () => {
-      if (!scope) return;
-      const res = await post<TemplateFillResult>("/api/template-fill-week", {
-        scope,
-        week: week.week,
-        weekPlans: week.plans,
-      });
-      setTmpl((t) => ({ ...t, [`week:${week.week}`]: { ...res, kind: "doc" } }));
-      if (!res.file?.webViewLink && res.fillError) setError(res.fillError);
-    }, `tmpl-week-${week.week}`);
-
   const steps: { key: Stage; label: string; enabled: boolean }[] = [
     { key: "config", label: "1. Inputs", enabled: true },
     { key: "scope", label: "2. Review S&S", enabled: !!scope },
@@ -405,11 +392,8 @@ export default function Page() {
                         <Button variant="ghost" onClick={genWeek(wk.week)} disabled={busy !== null || weekApproved[wk.week]}>
                           Regenerate
                         </Button>
-                        <Button variant="primary" disabled={busy !== null} onClick={fillWeekTemplate(generated)}>
-                          {busy === `tmpl-week-${wk.week}` ? "Creating…" : "Create from template → Drive"}
-                        </Button>
-                        <Button variant="ghost" onClick={() => exportLessonWeekDocx(scope, generated)}>
-                          Download draft only (.docx)
+                        <Button variant="secondary" onClick={() => exportLessonWeekDocx(scope, generated)}>
+                          Download (.docx)
                         </Button>
                         <Button
                           variant={weekApproved[wk.week] ? "success" : "primary"}
@@ -449,14 +433,6 @@ export default function Page() {
                       />
                     )}
                     {canonical[wk.week] && <CanonicalPanel c={canonical[wk.week]} />}
-                    {tmpl[`week:${wk.week}`] && (
-                      <div className="mt-4">
-                        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Weekly lesson-plan document
-                        </h4>
-                        <MatchCheck r={tmpl[`week:${wk.week}`]} />
-                      </div>
-                    )}
                     {debugOn && weekDebug[wk.week] && <DebugPanel d={weekDebug[wk.week]} />}
                   </>
                 )}
@@ -907,61 +883,3 @@ function ReadyToGenerate({
   );
 }
 
-type TemplateFillResult = {
-  placeholders: string[];
-  object: Record<string, string>;
-  templateMatchCheck: { unmapped: string[]; missing: string[]; duplicates: string[] };
-  facilitation: { field: string; verdict: string; reasons: string }[];
-  file: { id: string; webViewLink: string; shared?: "ok" | "failed" | "skipped" } | null;
-  fillError?: string;
-  kind?: "doc";
-};
-
-// Template Match Check panel: what mapped, what is missing / unmapped / duplicated,
-// and each facilitation's verdict — the pre-export flag list.
-function MatchCheck({ r }: { r: TemplateFillResult }) {
-  const c = r.templateMatchCheck;
-  const filled = r.placeholders.length - c.missing.length;
-  return (
-    <div className="mt-3 space-y-1 border-t border-slate-100 pt-2 text-xs">
-      {r.file?.webViewLink && (
-        <div className="rounded-md border border-green-300 bg-green-50 px-2 py-1.5 text-green-800">
-          <div className="font-semibold">✓ Lesson Plan created</div>
-          <a href={r.file.webViewLink} target="_blank" rel="noreferrer" className="text-brand-light underline">
-            Open Google Doc ↗
-          </a>
-          {r.file.shared === "ok" && <div className="mt-0.5">Shared with your Google account.</div>}
-          {r.file.shared === "failed" && (
-            <div className="mt-0.5 text-amber-700">
-              The files were created successfully but could not be shared automatically. Contact an administrator.
-            </div>
-          )}
-        </div>
-      )}
-      {r.fillError && <div className="text-amber-700">Not rendered: {r.fillError}</div>}
-      <div className="text-slate-600">
-        {filled}/{r.placeholders.length} fields filled · {c.missing.length} missing · {c.unmapped.length} unmapped ·{" "}
-        {c.duplicates.length} duplicate
-      </div>
-      {c.duplicates.length > 0 && (
-        <div className="text-slate-500">
-          Repeated tokens (filled with the same value in each spot): {c.duplicates.join(", ")}
-        </div>
-      )}
-      {c.missing.length > 0 && <div className="text-amber-700">Missing: {c.missing.join(", ")}</div>}
-      {c.unmapped.length > 0 && <div className="text-slate-500">Unmapped (ignored): {c.unmapped.join(", ")}</div>}
-      {r.facilitation.some((f) => f.verdict !== "PASS") && (
-        <div className="text-slate-600">
-          Facilitation needs review:{" "}
-          {r.facilitation
-            .filter((f) => f.verdict !== "PASS")
-            .map((f) => (
-              <span key={f.field} className={f.verdict === "REVISE" ? "text-amber-700" : "text-red-600"}>
-                {f.field} ({f.verdict === "REVISE" ? "adapted" : "replaced"}){" "}
-              </span>
-            ))}
-        </div>
-      )}
-    </div>
-  );
-}

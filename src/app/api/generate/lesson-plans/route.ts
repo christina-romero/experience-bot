@@ -36,23 +36,40 @@ export async function POST(req: Request) {
 
     // TWO KINGS pipeline: (A) write the canonical Access spine, (B) render the
     // HISD derivative FROM it, (C) run the fidelity gate as an adversarial diff.
-    const canonical = await generateStructured<CanonicalWeek>(
-      canonicalWeekPrompt({ scope, week, genome }),
-      canonicalWeekSchema,
-      { maxTokens: 16000 }
-    );
+    // The derivative (the lesson plans) is the essential output. The canonical
+    // and fidelity passes are best-effort: a failure in either must NOT block the
+    // lesson content from returning, so they are wrapped and degrade to null.
+    let canonical: CanonicalWeek | null = null;
+    try {
+      canonical = await generateStructured<CanonicalWeek>(
+        canonicalWeekPrompt({ scope, week, genome }),
+        canonicalWeekSchema,
+        { maxTokens: 20000 }
+      );
+    } catch (e) {
+      console.error(`Canonical spine failed for week ${week}:`, e);
+    }
 
+    // Detailed run-it-cold plans are long; give the derivative a large output
+    // budget so a full week is never truncated into invalid JSON.
     const data = await generateStructured<LessonWeek>(
-      lessonWeekPrompt({ scope, week, genome, canonical }),
+      lessonWeekPrompt({ scope, week, genome, canonical: canonical ?? undefined }),
       lessonWeekSchema,
-      { maxTokens: 32000 }
+      { maxTokens: 64000 }
     );
 
-    const fidelity = await generateStructured<FidelityWeek>(
-      fidelityGatePrompt({ scope, canonical, week: data }),
-      fidelityWeekSchema,
-      { maxTokens: 12000 }
-    );
+    let fidelity: FidelityWeek | null = null;
+    if (canonical) {
+      try {
+        fidelity = await generateStructured<FidelityWeek>(
+          fidelityGatePrompt({ scope, canonical, week: data }),
+          fidelityWeekSchema,
+          { maxTokens: 16000 }
+        );
+      } catch (e) {
+        console.error(`Fidelity gate failed for week ${week}:`, e);
+      }
+    }
 
     // Developer-only debug payload (surfaced in the app behind the ?debug=1 toggle).
     const debug = {
